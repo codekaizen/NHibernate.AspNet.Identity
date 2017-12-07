@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Transactions;
 using Microsoft.AspNetCore.Identity;B
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Moq;
 using NHibernate.AspNet.Identity.Tests.Models;
 using NHibernate.Linq;
 using NUnit.Framework;
@@ -17,7 +21,8 @@ namespace NHibernate.AspNet.Identity.Tests
     [TestClass]
     public class UserStoreTest
     {
-        ISession _session;
+        private ISession _session;
+        private UserManager<ApplicationUser> _userManager;
 
         [TestInitialize]
         public void Initialize()
@@ -25,6 +30,17 @@ namespace NHibernate.AspNet.Identity.Tests
             var factory = SessionFactoryProvider.Instance.SessionFactory;
             _session = factory.OpenSession();
             SessionFactoryProvider.Instance.BuildSchema();
+            var serviceProviderMock = new Mock<IServiceProvider>();
+            
+            _userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(_session),
+                new OptionsManager<IdentityOptions>(new OptionsFactory<IdentityOptions>(new IConfigureOptions<IdentityOptions>[0], new IPostConfigureOptions<IdentityOptions>[0])),
+                new PasswordHasher<ApplicationUser>(new OptionsManager<PasswordHasherOptions>(new OptionsFactory<PasswordHasherOptions>(new IConfigureOptions<PasswordHasherOptions>[0], new IPostConfigureOptions<PasswordHasherOptions>[0]))),
+                new IUserValidator<ApplicationUser>[0],
+                new IPasswordValidator<ApplicationUser>[0],
+                new UpperInvariantLookupNormalizer(),
+                new IdentityErrorDescriber(),
+                serviceProviderMock.Object,
+                new Logger<UserManager<ApplicationUser>>(new LoggerFactory()));
         }
 
         [TestCleanup]
@@ -87,7 +103,6 @@ namespace NHibernate.AspNet.Identity.Tests
         [TestMethod]
         public void WhenCreateUserAsync()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(_session));
             var user = new ApplicationUser() { UserName = "RealUserName" };
 
             using (var transaction = new TransactionScope())
@@ -139,12 +154,12 @@ namespace NHibernate.AspNet.Identity.Tests
 
             Assert.IsTrue(_session.Query<IdentityRole>().Any(x => x.Name == "ADM05"));
             Assert.IsTrue(_session.Query<IdentityUser>().Any(x => x.UserName == "Lukz 05"));
-            Assert.IsTrue(store.IsInRoleAsync(user, "ADM05"));
+            Assert.IsTrue(await store.IsInRoleAsync(user, "ADM05"));
 
             var result = store.RemoveFromRoleAsync(user, "ADM05");
 
             Assert.IsNull(result.Exception);
-            Assert.IsFalse(store.IsInRoleAsync(user, "ADM05"));
+            Assert.IsFalse(await store.IsInRoleAsync(user, "ADM05"));
             Assert.IsTrue(_session.Query<IdentityUser>().Any(x => x.UserName == "Lukz 05"));
             Assert.IsTrue(_session.Query<IdentityRole>().Any(x => x.Name == "ADM05"));
         }
@@ -160,15 +175,15 @@ namespace NHibernate.AspNet.Identity.Tests
             var store = new UserStore<IdentityUser>(this._session);
             var roleStore = new RoleStore<IdentityRole>(this._session);
 
-            roleStore.CreateAsync(role);
-            store.CreateAsync(user1);
-            store.CreateAsync(user2);
-            store.CreateAsync(user3);
-            store.CreateAsync(user4);
-            store.AddToRoleAsync(user1, "ADM");
-            store.AddToRoleAsync(user2, "ADM");
-            store.AddToRoleAsync(user3, "ADM");
-            store.AddToRoleAsync(user4, "ADM");
+            await roleStore.CreateAsync(role);
+            await store.CreateAsync(user1);
+            await store.CreateAsync(user2);
+            await store.CreateAsync(user3);
+            await store.CreateAsync(user4);
+            await store.AddToRoleAsync(user1, "ADM");
+            await store.AddToRoleAsync(user2, "ADM");
+            await store.AddToRoleAsync(user3, "ADM");
+            await store.AddToRoleAsync(user4, "ADM");
 
             Assert.IsTrue(this._session.Query<IdentityRole>().Any(x => x.Name == "ADM"));
             Assert.IsTrue(this._session.Query<IdentityUser>().Any(x => x.UserName == "Lukz 04"));
@@ -192,27 +207,27 @@ namespace NHibernate.AspNet.Identity.Tests
             var store = new UserStore<IdentityUser>(this._session);
             var roleStore = new RoleStore<IdentityRole>(this._session);
 
-            roleStore.CreateAsync(role);
-            roleStore.CreateAsync(role2);
-            store.CreateAsync(user1);
-            store.CreateAsync(user2);
-            store.CreateAsync(user3);
-            store.CreateAsync(user4);
-            store.AddToRoleAsync(user1, "ADM");
-            store.AddToRoleAsync(user2, "ADM");
-            store.AddToRoleAsync(user3, "ADM");
-            store.AddToRoleAsync(user4, "ADM");
-            store.AddToRoleAsync(user1, "USR");
-            store.AddToRoleAsync(user4, "USR");
+            await roleStore.CreateAsync(role);
+            await roleStore.CreateAsync(role2);
+            await store.CreateAsync(user1);
+            await store.CreateAsync(user2);
+            await store.CreateAsync(user3);
+            await store.CreateAsync(user4);
+            await store.AddToRoleAsync(user1, "ADM");
+            await store.AddToRoleAsync(user2, "ADM");
+            await store.AddToRoleAsync(user3, "ADM");
+            await store.AddToRoleAsync(user4, "ADM");
+            await store.AddToRoleAsync(user1, "USR");
+            await store.AddToRoleAsync(user4, "USR");
 
             Assert.IsTrue(this._session.Query<IdentityRole>().Any(x => x.Name == "ADM"));
             Assert.IsTrue(this._session.Query<IdentityUser>().Any(x => x.UserName == "Lukz 04"));
 
             Assert.IsTrue(this._session.Query<IdentityUser>().Any(x => x.UserName == "Andre 03"));
 
-            var resul = roleStore.Roles;
+            var result = roleStore.Roles;
 
-            Assert.AreEqual(2, resul.Count());
+            Assert.AreEqual(2, result.Count());
         }
 
         [TestMethod]
