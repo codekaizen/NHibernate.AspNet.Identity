@@ -112,6 +112,8 @@
     <Compile Include="IdentityUserLogin.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="IdentityUserToken.cs" />
+    <Compile Include="IdentityUserTokenMap.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>

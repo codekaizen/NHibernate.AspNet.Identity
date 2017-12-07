@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.AspNetCore.Identity;
 using NHibernate.Mapping.ByCode;
 using NHibernate.Mapping.ByCode.Conformist;
@@ -27,6 +28,42 @@ namespace NHibernate.AspNet.Identity
         {
             this.UserName = userName;
         }
+
+        public void AddToken(IdentityUserToken<string> token)
+        {
+            if (token == null)
+                throw new ArgumentNullException(nameof(token));
+
+            var userToken = new IdentityUserToken
+            {
+                UserId = token.UserId,
+                Name = token.Name,
+                LoginProvider = token.LoginProvider,
+                Value = token.Value
+            };
+
+            EnsureTokensCollection();
+            this.Tokens.Add(userToken);
+        }
+
+        public bool RemoveToken(IdentityUserToken<string> token)
+        {
+            if (token == null)
+                throw new ArgumentNullException(nameof(token));
+
+            var toRemove = this.Tokens?.SingleOrDefault(t => t.Equals(token));
+            return toRemove != null && this.Tokens.Remove(toRemove);
+        }
+
+        private void EnsureTokensCollection()
+        {
+            if (this.Tokens == null)
+            {
+                this.Tokens = new List<IdentityUserToken>();
+            }
+        }
+
+        internal void AddRole(IdentityRole roleEntity) => throw new NotImplementedException();
     }
 
     public class IdentityUserMap : ClassMapping<IdentityUser>

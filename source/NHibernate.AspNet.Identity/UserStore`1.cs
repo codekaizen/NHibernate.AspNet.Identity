@@ -315,16 +315,24 @@ namespace NHibernate.AspNet.Identity
             return token;
         }
 
-        protected override Task AddUserTokenAsync(IdentityUserToken<string> token)
+        protected override async Task AddUserTokenAsync(IdentityUserToken<string> token)
         {
-            UserTokens.Add(token);
-            return Task.CompletedTask;
+            this.ThrowIfDisposed();
+            if (token == null)
+                throw new ArgumentNullException(nameof(token));
+            var user = (IdentityUser)await Context.GetAsync(typeof(IdentityUser), token.UserId);
+            user.AddToken(token);
+            await Context.FlushAsync();
         }
 
-        protected override Task RemoveUserTokenAsync(IdentityUserToken<string> token)
+        protected override async Task RemoveUserTokenAsync(IdentityUserToken<string> token)
         {
-            UserTokens.Remove(token);
-            return Task.CompletedTask;
+            this.ThrowIfDisposed();
+            if (token == null)
+                throw new ArgumentNullException(nameof(token));
+            var user = (IdentityUser)await Context.GetAsync(typeof(IdentityUser), token.UserId);
+            user.RemoveToken(token);
+            await Context.FlushAsync();
         }
 
         //public virtual Task AddClaimAsync(TUser user, Claim claim, CancellationToken cancellationToken = default(CancellationToken))
@@ -381,78 +389,67 @@ namespace NHibernate.AspNet.Identity
         //    return Task.FromResult(0);
         //}
 
-        public virtual Task AddToRoleAsync(TUser user, string role, CancellationToken cancellationToken = default(CancellationToken))
+        public virtual async Task AddToRoleAsync(TUser user, string normalizedRoleName, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
-            {
                 throw new ArgumentNullException(nameof(user));
-            }
             if (string.IsNullOrWhiteSpace(normalizedRoleName))
-            {
                 throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(normalizedRoleName));
-            }
-            var roleEntity = await FindRoleAsync(normalizedRoleName, cancellationToken);
+
+            var roleEntity = await this.Context.Query<IdentityRole>().SingleOrDefaultAsync(r => r.NormalizedName == normalizedRoleName, cancellationToken);
             if (roleEntity == null)
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.CurrentCulture, Resources.RoleNotFound, normalizedRoleName));
             }
-            UserRoles.Add(CreateUserRole(user, roleEntity));
+
+            user = await this.Context.MergeAsync(user, cancellationToken);
+            user.AddRole(roleEntity);
+            await Context.FlushAsync(cancellationToken);
         }
 
-        public virtual Task RemoveFromRoleAsync(TUser user, string role, CancellationToken cancellationToken = default(CancellationToken))
+        public virtual async Task RemoveFromRoleAsync(TUser user, string normalizedRoleName, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
-            {
                 throw new ArgumentNullException(nameof(user));
-            }
-            if (string.IsNullOrWhiteSpace(role))
-            {
-                throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(role));
-            }
+            if (string.IsNullOrWhiteSpace(normalizedRoleName))
+                throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(normalizedRoleName));
 
-            var identityUserRole = user.Roles.FirstOrDefault(r => r.Name.ToUpper() == role.ToUpper());
+            user = await this.Context.MergeAsync(user, cancellationToken);
+            var identityUserRole = user.Roles.FirstOrDefault(r => r.NormalizedName == normalizedRoleName);
             if (identityUserRole != null)
             {
                 user.Roles.Remove(identityUserRole);
             }
 
-            return Task.FromResult(0);
+            await Context.FlushAsync(cancellationToken);
         }
 
-        public virtual Task<IList<string>> GetRolesAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
+        public virtual async Task<IList<string>> GetRolesAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
-            {
                 throw new ArgumentNullException(nameof(user));
-            }
-            else
-            {
-                return Task.FromResult((IList<string>)user.Roles.Select(u => u.Name).ToList());
-            }
+
+            user = await this.Context.MergeAsync(user, cancellationToken);
+            return user.Roles.Select(u => u.Name).ToList();
         }
 
-        public virtual Task<bool> IsInRoleAsync(TUser user, string role, CancellationToken cancellationToken = default(CancellationToken))
+        public virtual async Task<bool> IsInRoleAsync(TUser user, string normalizedRoleName, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
-            {
                 throw new ArgumentNullException(nameof(user));
-            }
-            if (string.IsNullOrWhiteSpace(role))
-            {
-                throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(role));
-            }
-            else
-            {
-                return Task.FromResult(Enumerable.Any(user.Roles, r => r.Name.ToUpper() == role.ToUpper()));
-            }
+            if (string.IsNullOrWhiteSpace(normalizedRoleName))
+                throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(normalizedRoleName));
+
+            user = await this.Context.MergeAsync(user, cancellationToken);
+            return user.Roles.Any(r => r.NormalizedName == normalizedRoleName);
         }
 
         public async Task<IList<TUser>> GetUsersInRoleAsync(string normalizedRoleName, CancellationToken cancellationToken = default(CancellationToken))
@@ -465,19 +462,17 @@ namespace NHibernate.AspNet.Identity
                 throw new ArgumentNullException(nameof(normalizedRoleName));
             }
 
-            var role = await FindRoleAsync(normalizedRoleName, cancellationToken);
+            var role = await Context.Query<IdentityRole>().Where(r => r.NormalizedName == normalizedRoleName)
+                .SingleOrDefaultAsync(cancellationToken);
 
-            if (role != null)
-            {
-                var query = from userrole in UserRoles
-                            join user in Users on userrole.UserId equals user.Id
-                            where userrole.RoleId.Equals(role.Id)
-                            select user;
+            if (role == null)
+                return new List<TUser>();
 
-                return await query.ToListAsync(cancellationToken);
-            }
-            return new List<TUser>();
+            var query = from user in Users
+                        where user.Roles.Any(r => r == role)
+                        select user;
 
+            return await query.ToListAsync(cancellationToken);
         }
 
         public override IQueryable<TUser> Users
