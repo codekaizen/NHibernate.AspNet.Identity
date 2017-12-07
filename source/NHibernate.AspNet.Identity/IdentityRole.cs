@@ -1,19 +1,18 @@
+using System;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Identity;
 using NHibernate.AspNet.Identity.DomainModel;
 using NHibernate.Mapping.ByCode;
 using NHibernate.Mapping.ByCode.Conformist;
 
 namespace NHibernate.AspNet.Identity
 {
-    public class IdentityRole : EntityWithTypedId<string>
+    public class IdentityRole : IdentityRole<string>
     {
-        public virtual string Name { get; set; }
-
         public virtual ICollection<IdentityUser> Users { get; protected set; }
 
         public IdentityRole()
         {
-            this.Users = (ICollection<IdentityUser>)new List<IdentityUser>();
         }
 
         public IdentityRole(string roleName) : this()
@@ -22,7 +21,7 @@ namespace NHibernate.AspNet.Identity
         }
     }
 
-    public class IdentityRoleMap : ClassMapping<IdentityRole> 
+    public class IdentityRoleMap : ClassMapping<IdentityRole>
     {
         public IdentityRoleMap()
         {

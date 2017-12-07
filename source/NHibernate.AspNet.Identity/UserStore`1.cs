@@ -16,10 +16,9 @@ namespace NHibernate.AspNet.Identity
     /// Implements IUserStore using NHibernate where TUser is the entity type of the user being stored
     /// </summary>
     /// <typeparam name="TUser"/>
-    public class UserStore<TUser> : UserStoreBase<TUser, String, IdentityUserClaim, IdentityUserLogin, IdentityUserToken<string>>, IUserLoginStore<TUser>, IUserClaimStore<TUser>, IUserRoleStore<TUser>, IUserPasswordStore<TUser>, IUserSecurityStampStore<TUser>, IQueryableUserStore<TUser>, IUserStore<TUser>, IUserLockoutStore<TUser>, IUserEmailStore<TUser>, IUserPhoneNumberStore<TUser>, IUserTwoFactorStore<TUser>, IDisposable where TUser : IdentityUser<String>
+    public class UserStore<TUser> : UserStoreBase<TUser, string, IdentityUserClaim, IdentityUserLogin, IdentityUserToken<string>>, IUserRoleStore<TUser>
+        where TUser : IdentityUser
     {
-        private bool _disposed;
-
         /// <summary>
         /// If true then disposing this object will also dispose (close) the session. False means that external code is responsible for disposing the session.
         /// </summary>
@@ -28,6 +27,7 @@ namespace NHibernate.AspNet.Identity
         public ISession Context { get; private set; }
 
         public UserStore(ISession context)
+            : base(new IdentityErrorDescriber())
         {
             if (context == null)
             {
@@ -54,56 +54,56 @@ namespace NHibernate.AspNet.Identity
             return this.GetUserAggregateAsync(u => u.UserName.ToUpper() == userName.ToUpper());
         }
 
-        public override Task<string> GetUserIdAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
+        protected override async Task<TUser> FindUserAsync(string userId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
-            if (user == null)
-                throw new ArgumentNullException(nameof(user));
-            return Task.FromResult(user.Id);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                throw new ArgumentException(nameof(userId));
+            }
+
+            return await this.Context.GetAsync<TUser>(userId, cancellationToken);
         }
 
-        public override Task<string> GetUserNameAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
+        protected override async Task<IdentityUserLogin> FindUserLoginAsync(string userId, string loginProvider, string providerKey, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
-            if (user == null)
-                throw new ArgumentNullException(nameof(user));
-            return Task.FromResult(user.UserName);
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ArgumentException(nameof(userId));
+            if (string.IsNullOrWhiteSpace(loginProvider))
+                throw new ArgumentException(nameof(loginProvider));
+            if (string.IsNullOrWhiteSpace(providerKey))
+                throw new ArgumentException(nameof(providerKey));
+
+            var query = from u in this.Users
+                        where u.Id == userId
+                        from l in u.Logins
+                        where l.LoginProvider == loginProvider && l.ProviderKey == providerKey
+                        select l;
+
+            return await query.SingleOrDefaultAsync(cancellationToken);
         }
 
-        public override Task SetUserNameAsync(TUser user, string userName, CancellationToken cancellationToken = default(CancellationToken))
+        protected override async Task<IdentityUserLogin> FindUserLoginAsync(string loginProvider, string providerKey, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
-            if (user == null)
-                throw new ArgumentNullException(nameof(user));
-            if (string.IsNullOrWhiteSpace(userName))
-                throw new ArgumentException(nameof(userName));
+            if (string.IsNullOrWhiteSpace(loginProvider))
+                throw new ArgumentException(nameof(loginProvider));
+            if (string.IsNullOrWhiteSpace(providerKey))
+                throw new ArgumentException(nameof(providerKey));
 
+            var query = from u in this.Users
+                        from l in u.Logins
+                        where l.LoginProvider == loginProvider && l.ProviderKey == providerKey
+                        select l;
+
+            return await query.SingleOrDefaultAsync(cancellationToken);
         }
 
-        public Task<string> GetNormalizedUserNameAsync(TUser user, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-                throw new ArgumentNullException(nameof(user));
-            throw new NotImplementedException();
-        }
-
-        public Task SetNormalizedUserNameAsync(TUser user, string normalizedName, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-                throw new ArgumentNullException(nameof(user));
-            if (string.IsNullOrWhiteSpace(userName))
-                throw new ArgumentException(nameof(userName));
-            throw new NotImplementedException();
-        }
-
-        public virtual Task<IdentityResult> CreateAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
+        public override Task<IdentityResult> CreateAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
@@ -116,7 +116,7 @@ namespace NHibernate.AspNet.Identity
             return Task.FromResult(IdentityResult.Success);
         }
 
-        public virtual Task<IdentityResult> DeleteAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
+        public override Task<IdentityResult> DeleteAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
@@ -129,7 +129,7 @@ namespace NHibernate.AspNet.Identity
             return Task.FromResult(IdentityResult.Success);
         }
 
-        public virtual Task<IdentityResult> UpdateAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
+        public override Task<IdentityResult> UpdateAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
@@ -142,59 +142,14 @@ namespace NHibernate.AspNet.Identity
             return Task.FromResult(IdentityResult.Success);
         }
 
-        private void ThrowIfDisposed()
-        {
-            if (this._disposed)
-            {
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-        }
-
-        public void Dispose()
-        {
-            this.Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposing && this.Context != null && this.ShouldDisposeSession)
-            {
-                this.Context.Dispose();
-            }
-            this._disposed = true;
-            this.Context = null;
-        }
-
-        public virtual async Task<TUser> FindAsync(UserLoginInfo login, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (login == null)
-            {
-                throw new ArgumentNullException(nameof(login));
-            }
-
-            var query = from u in this.Context.Query<TUser>()
-                from l in u.Logins
-                where l.LoginProvider == login.LoginProvider && l.ProviderKey == login.ProviderKey
-                select u;
-
-            return await query.SingleOrDefaultAsync(cancellationToken);
-        }
-
-        public virtual async Task AddLoginAsync(TUser user, UserLoginInfo login, CancellationToken cancellationToken = default(CancellationToken))
+        public override async Task AddLoginAsync(TUser user, UserLoginInfo login, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
-            {
                 throw new ArgumentNullException(nameof(user));
-            }
             if (login == null)
-            {
                 throw new ArgumentNullException(nameof(login));
-            }
 
             user.Logins.Add(new IdentityUserLogin
             {
@@ -205,162 +160,226 @@ namespace NHibernate.AspNet.Identity
             await this.Context.SaveOrUpdateAsync(user, cancellationToken);
         }
 
-        public Task RemoveLoginAsync(TUser user, string loginProvider, string providerKey, CancellationToken cancellationToken)
+        public override async Task RemoveLoginAsync(TUser user, string loginProvider, string providerKey, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
                 throw new ArgumentNullException(nameof(user));
-            throw new NotImplementedException();
+            if (string.IsNullOrWhiteSpace(loginProvider))
+                throw new ArgumentException(nameof(loginProvider));
+            if (string.IsNullOrWhiteSpace(providerKey))
+                throw new ArgumentException(nameof(providerKey));
+
+            user = await this.Context.MergeAsync(user, cancellationToken);
+            var login = user.Logins.SingleOrDefault(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey);
+            if (login != null)
+            {
+                user.Logins.Remove(login);
+                await this.Context.FlushAsync(cancellationToken);
+            }
         }
 
-        public virtual Task RemoveLoginAsync(TUser user, UserLoginInfo login, CancellationToken cancellationToken = default(CancellationToken))
+        //public virtual Task RemoveLoginAsync(TUser user, UserLoginInfo login, CancellationToken cancellationToken = default(CancellationToken))
+        //{
+        //    cancellationToken.ThrowIfCancellationRequested();
+        //    this.ThrowIfDisposed();
+        //    if (user == null)
+        //        throw new ArgumentNullException(nameof(user));
+        //    if (login == null)
+        //        throw new ArgumentNullException(nameof(login));
+
+        //    var info = user.Logins.SingleOrDefault(x => x.LoginProvider == login.LoginProvider && x.ProviderKey == login.ProviderKey);
+        //    if (info != null)
+        //    {
+        //        user.Logins.Remove(info);
+        //        this.Context.Update(user);
+        //    }
+
+        //    return Task.FromResult(0);
+        //}
+
+        public override Task<IList<UserLoginInfo>> GetLoginsAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
-            {
                 throw new ArgumentNullException(nameof(user));
-            }
-            if (login == null)
-            {
-                throw new ArgumentNullException(nameof(login));
-            }
 
-            var info = user.Logins.SingleOrDefault(x => x.LoginProvider == login.LoginProvider && x.ProviderKey == login.ProviderKey);
-            if (info != null)
-            {
-                user.Logins.Remove(info);
-                this.Context.Update(user);
-            }
-
-            return Task.FromResult(0);
-        }
-
-        public virtual Task<IList<UserLoginInfo>> GetLoginsAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-
-            IList<UserLoginInfo> result = new List<UserLoginInfo>();
-            foreach (var identityUserLogin in user.Logins)
-            {
-                result.Add(new UserLoginInfo(identityUserLogin.LoginProvider, identityUserLogin.ProviderKey, user.UserName));
-            }
-
+            IList<UserLoginInfo> result = user.Logins.Select(l => new UserLoginInfo(l.LoginProvider, l.ProviderKey, user.UserName)).ToList();
             return Task.FromResult(result);
         }
 
-        public Task<TUser> FindByLoginAsync(string loginProvider, string providerKey, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public virtual Task<IList<Claim>> GetClaimsAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
+        public override Task<IList<Claim>> GetClaimsAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
-            {
                 throw new ArgumentNullException(nameof(user));
-            }
 
-            IList<Claim> result = new List<Claim>();
-            foreach (var identityUserClaim in user.Claims)
-            {
-                result.Add(new Claim(identityUserClaim.ClaimType, identityUserClaim.ClaimValue));
-            }
-
+            IList<Claim> result = user.Claims.Select(c => new Claim(c.ClaimType, c.ClaimValue)).ToList();
             return Task.FromResult(result);
         }
 
-        public Task AddClaimsAsync(TUser user, IEnumerable<Claim> claims, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public Task ReplaceClaimAsync(TUser user, Claim claim, Claim newClaim, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public Task RemoveClaimsAsync(TUser user, IEnumerable<Claim> claims, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public Task<IList<TUser>> GetUsersForClaimAsync(Claim claim, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public virtual Task AddClaimAsync(TUser user, Claim claim, CancellationToken cancellationToken = default(CancellationToken))
+        public override async Task AddClaimsAsync(TUser user, IEnumerable<Claim> claims, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
-            {
                 throw new ArgumentNullException(nameof(user));
-            }
-            if (claim == null)
+            if (claims == null)
+                throw new ArgumentNullException(nameof(claims));
+            user = await this.Context.MergeAsync(user, cancellationToken);
+            foreach (var claim in claims)
             {
-                throw new ArgumentNullException(nameof(claim));
+                user.Claims.Add(new IdentityUserClaim
+                {
+                    ClaimType = claim.Type,
+                    ClaimValue = claim.Value,
+                    User = user,
+                    UserId = user.Id
+                });
             }
-
-            user.Claims.Add(new IdentityUserClaim()
-            {
-                User = user,
-                ClaimType = claim.Type,
-                ClaimValue = claim.Value
-            });
-
-            return Task.FromResult(0);
+            await this.Context.FlushAsync(cancellationToken);
         }
 
-        public virtual Task RemoveClaimAsync(TUser user, Claim claim, CancellationToken cancellationToken = default(CancellationToken))
+        public override async Task ReplaceClaimAsync(TUser user, Claim claim, Claim newClaim, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            this.ThrowIfDisposed();
+
+            if (user == null)
+                throw new ArgumentNullException(nameof(user));
+            if (claim == null)
+                throw new ArgumentNullException(nameof(claim));
+            if (newClaim == null)
+                throw new ArgumentNullException(nameof(newClaim));
+
+            user = await this.Context.MergeAsync(user, cancellationToken);
+            var userClaims = user.Claims;
+            var matchedClaims = userClaims.Where(uc => uc.UserId.Equals(user.Id) && uc.ClaimValue == claim.Value && uc.ClaimType == claim.Type).ToList();
+            foreach (var matchedClaim in matchedClaims)
+            {
+                matchedClaim.ClaimValue = newClaim.Value;
+                matchedClaim.ClaimType = newClaim.Type;
+            }
+
+            await this.Context.FlushAsync(cancellationToken);
+        }
+
+        public override async Task RemoveClaimsAsync(TUser user, IEnumerable<Claim> claimsToRemove, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (user == null)
-            {
                 throw new ArgumentNullException(nameof(user));
-            }
-            if (claim == null)
-            {
-                throw new ArgumentNullException(nameof(claim));
-            }
+            if (claimsToRemove == null)
+                throw new ArgumentNullException(nameof(claimsToRemove));
 
-            foreach (var identityUserClaim in Enumerable.ToList(Enumerable.Where(user.Claims, uc =>
-            {
-                if (uc.ClaimValue == claim.Value)
-                {
-                    return uc.ClaimType == claim.Type;
-                }
-                else
-                {
-                    return false;
-                }
-            })))
-            {
-                user.Claims.Remove(identityUserClaim);
-            }
-
-            return Task.FromResult(0);
+            user = await this.Context.MergeAsync(user, cancellationToken);
+            var toRemoveList = claimsToRemove.ToList();
+            var removeSet = user.Claims.Where(c => toRemoveList.Any(r => r.Type == c.ClaimType && r.Value == c.ClaimValue)).ToList();
+            removeSet.ForEach(c => user.Claims.Remove(c));
+            await this.Context.FlushAsync(cancellationToken);
         }
+
+        public override async Task<IList<TUser>> GetUsersForClaimAsync(Claim claim, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            this.ThrowIfDisposed();
+            if (claim == null)
+                throw new ArgumentNullException(nameof(claim));
+
+            var query = from userClaim in Context.Query<IdentityUserClaim>()
+                        join user in Users on userClaim.UserId equals user.Id
+                        where userClaim.ClaimValue == claim.Value && userClaim.ClaimType == claim.Type
+                        select user;
+
+            return await query.ToListAsync(cancellationToken);
+        }
+
+        // ReSharper disable once OptionalParameterHierarchyMismatch
+        protected override async Task<IdentityUserToken<string>> FindTokenAsync(TUser user, string loginProvider, string name, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            this.ThrowIfDisposed();
+            if (user == null)
+                throw new ArgumentNullException(nameof(user));
+            if (string.IsNullOrWhiteSpace(loginProvider))
+                throw new ArgumentException(nameof(loginProvider));
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException(nameof(name));
+
+            user = await this.Context.MergeAsync(user, cancellationToken);
+            var token = user.Tokens.SingleOrDefault(t => t.Name == name && t.LoginProvider == loginProvider);
+            return token;
+        }
+
+        protected override Task AddUserTokenAsync(IdentityUserToken<string> token)
+        {
+            UserTokens.Add(token);
+            return Task.CompletedTask;
+        }
+
+        protected override Task RemoveUserTokenAsync(IdentityUserToken<string> token)
+        {
+            UserTokens.Remove(token);
+            return Task.CompletedTask;
+        }
+
+        //public virtual Task AddClaimAsync(TUser user, Claim claim, CancellationToken cancellationToken = default(CancellationToken))
+        //{
+        //    cancellationToken.ThrowIfCancellationRequested();
+        //    this.ThrowIfDisposed();
+        //    if (user == null)
+        //    {
+        //        throw new ArgumentNullException(nameof(user));
+        //    }
+        //    if (claim == null)
+        //    {
+        //        throw new ArgumentNullException(nameof(claim));
+        //    }
+
+        //    user.Claims.Add(new IdentityUserClaim()
+        //    {
+        //        User = user,
+        //        ClaimType = claim.Type,
+        //        ClaimValue = claim.Value
+        //    });
+
+        //    return Task.FromResult(0);
+        //}
+
+        //public virtual Task RemoveClaimAsync(TUser user, Claim claim, CancellationToken cancellationToken = default(CancellationToken))
+        //{
+        //    cancellationToken.ThrowIfCancellationRequested();
+        //    this.ThrowIfDisposed();
+        //    if (user == null)
+        //    {
+        //        throw new ArgumentNullException(nameof(user));
+        //    }
+        //    if (claim == null)
+        //    {
+        //        throw new ArgumentNullException(nameof(claim));
+        //    }
+
+        //    foreach (var identityUserClaim in Enumerable.ToList(Enumerable.Where(user.Claims, uc =>
+        //    {
+        //        if (uc.ClaimValue == claim.Value)
+        //        {
+        //            return uc.ClaimType == claim.Type;
+        //        }
+        //        else
+        //        {
+        //            return false;
+        //        }
+        //    })))
+        //    {
+        //        user.Claims.Remove(identityUserClaim);
+        //    }
+
+        //    return Task.FromResult(0);
+        //}
 
         public virtual Task AddToRoleAsync(TUser user, string role, CancellationToken cancellationToken = default(CancellationToken))
         {
@@ -370,20 +389,16 @@ namespace NHibernate.AspNet.Identity
             {
                 throw new ArgumentNullException(nameof(user));
             }
-            if (string.IsNullOrWhiteSpace(role))
+            if (string.IsNullOrWhiteSpace(normalizedRoleName))
             {
-                throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(role));
+                throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(normalizedRoleName));
             }
-
-            var identityRole = this.Context.Query<IdentityRole>().SingleOrDefault(r => r.Name.ToUpper() == role.ToUpper());
-            if (identityRole == null)
+            var roleEntity = await FindRoleAsync(normalizedRoleName, cancellationToken);
+            if (roleEntity == null)
             {
-                throw new InvalidOperationException(string.Format(CultureInfo.CurrentCulture, Resources.RoleNotFound, new object[1] { role }));
+                throw new InvalidOperationException(string.Format(CultureInfo.CurrentCulture, Resources.RoleNotFound, normalizedRoleName));
             }
-            user.Roles.Add(identityRole);
-      
-            return Task.FromResult(0);
-
+            UserRoles.Add(CreateUserRole(user, roleEntity));
         }
 
         public virtual Task RemoveFromRoleAsync(TUser user, string role, CancellationToken cancellationToken = default(CancellationToken))
@@ -399,7 +414,7 @@ namespace NHibernate.AspNet.Identity
                 throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(role));
             }
 
-            var identityUserRole = Enumerable.FirstOrDefault(Enumerable.Where(user.Roles, r => r.Name.ToUpper() == role.ToUpper()));
+            var identityUserRole = user.Roles.FirstOrDefault(r => r.Name.ToUpper() == role.ToUpper());
             if (identityUserRole != null)
             {
                 user.Roles.Remove(identityUserRole);
@@ -418,7 +433,7 @@ namespace NHibernate.AspNet.Identity
             }
             else
             {
-                return Task.FromResult((IList<string>)Enumerable.ToList(Enumerable.Select(user.Roles, u => u.Name)));
+                return Task.FromResult((IList<string>)user.Roles.Select(u => u.Name).ToList());
             }
         }
 
@@ -440,73 +455,32 @@ namespace NHibernate.AspNet.Identity
             }
         }
 
-        public Task<IList<TUser>> GetUsersInRoleAsync(string roleName, CancellationToken cancellationToken)
+        public async Task<IList<TUser>> GetUsersInRoleAsync(string normalizedRoleName, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
-            throw new NotImplementedException();
+
+            if (string.IsNullOrEmpty(normalizedRoleName))
+            {
+                throw new ArgumentNullException(nameof(normalizedRoleName));
+            }
+
+            var role = await FindRoleAsync(normalizedRoleName, cancellationToken);
+
+            if (role != null)
+            {
+                var query = from userrole in UserRoles
+                            join user in Users on userrole.UserId equals user.Id
+                            where userrole.RoleId.Equals(role.Id)
+                            select user;
+
+                return await query.ToListAsync(cancellationToken);
+            }
+            return new List<TUser>();
+
         }
 
-        public virtual Task SetPasswordHashAsync(TUser user, string passwordHash, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.PasswordHash = passwordHash;
-            return Task.FromResult(0);
-        }
-
-        public virtual Task<string> GetPasswordHashAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            else
-            {
-                return Task.FromResult(user.PasswordHash);
-            }
-        }
-
-        public virtual Task SetSecurityStampAsync(TUser user, string stamp, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.SecurityStamp = stamp;
-            return Task.FromResult(0);
-        }
-
-        public virtual Task<string> GetSecurityStampAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            else
-            {
-                return Task.FromResult(user.SecurityStamp);
-            }
-        }
-
-        public virtual Task<bool> HasPasswordAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            return Task.FromResult(user.PasswordHash != null);
-        }
-
-        public IQueryable<TUser> Users
+        public override IQueryable<TUser> Users
         {
             get
             {
@@ -515,254 +489,39 @@ namespace NHibernate.AspNet.Identity
             }
         }
 
-        public Task<int> GetAccessFailedCountAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            return Task.FromResult(user.AccessFailedCount);
-        }
+        //Task<DateTimeOffset?> IUserLockoutStore<TUser>.GetLockoutEndDateAsync(TUser user, CancellationToken cancellationToken)
+        //{
+        //    cancellationToken.ThrowIfCancellationRequested();
+        //    this.ThrowIfDisposed();
+        //    throw new NotImplementedException();
+        //}
 
-        public virtual Task<bool> GetLockoutEnabledAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            return Task.FromResult(user.LockoutEnabled);
-        }
+        //public virtual Task SetLockoutEndDateAsync(TUser user, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default(CancellationToken))
+        //{
+        //    DateTime? nullable;
+        //    cancellationToken.ThrowIfCancellationRequested();
+        //    this.ThrowIfDisposed();
+        //    if (user == null)
+        //    {
+        //        throw new ArgumentNullException(nameof(user));
+        //    }
+        //    if (lockoutEnd == DateTimeOffset.MinValue)
+        //    {
+        //        nullable = null;
+        //    }
+        //    else
+        //    {
+        //        nullable = new DateTime?(lockoutEnd.UtcDateTime);
+        //    }
+        //    user.LockoutEndDateUtc = nullable;
+        //    return Task.FromResult(0);
+        //}
 
-        public virtual Task<DateTimeOffset> GetLockoutEndDateAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            DateTimeOffset dateTimeOffset;
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            if (user.LockoutEndDateUtc.HasValue)
-            {
-                var lockoutEndDateUtc = user.LockoutEndDateUtc;
-                dateTimeOffset = new DateTimeOffset(DateTime.SpecifyKind(lockoutEndDateUtc.Value, DateTimeKind.Utc));
-            }
-            else
-            {
-                dateTimeOffset = new DateTimeOffset();
-            }
-            return Task.FromResult(dateTimeOffset);
-        }
-
-        public Task SetLockoutEndDateAsync(TUser user, DateTimeOffset? lockoutEnd, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        Task<DateTimeOffset?> IUserLockoutStore<TUser>.GetLockoutEndDateAsync(TUser user, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public virtual Task<int> IncrementAccessFailedCountAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.AccessFailedCount = user.AccessFailedCount + 1;
-            return Task.FromResult(user.AccessFailedCount);
-        }
-
-        public virtual Task ResetAccessFailedCountAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.AccessFailedCount = 0;
-            return Task.FromResult(0);
-        }
-
-        public virtual Task SetLockoutEnabledAsync(TUser user, bool enabled, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.LockoutEnabled = enabled;
-            return Task.FromResult(0);
-        }
-
-        public virtual Task SetLockoutEndDateAsync(TUser user, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            DateTime? nullable;
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            if (lockoutEnd == DateTimeOffset.MinValue)
-            {
-                nullable = null;
-            }
-            else
-            {
-                nullable = new DateTime?(lockoutEnd.UtcDateTime);
-            }
-            user.LockoutEndDateUtc = nullable;
-            return Task.FromResult(0);
-        }
-
-        public virtual Task<TUser> FindByEmailAsync(string email, CancellationToken cancellationToken = default(CancellationToken))
+        public override Task<TUser> FindByEmailAsync(string email, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             return this.GetUserAggregateAsync(u => u.Email.ToUpper() == email.ToUpper());
-        }
-
-        public Task<string> GetNormalizedEmailAsync(TUser user, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public Task SetNormalizedEmailAsync(TUser user, string normalizedEmail, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public virtual Task<string> GetEmailAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            return Task.FromResult(user.Email);
-        }
-
-        public virtual Task<bool> GetEmailConfirmedAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            return Task.FromResult(user.EmailConfirmed);
-        }
-
-        public virtual Task SetEmailAsync(TUser user, string email, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.Email = email;
-            return Task.FromResult(0);
-        }
-
-        public virtual Task SetEmailConfirmedAsync(TUser user, bool confirmed, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.EmailConfirmed = confirmed;
-            return Task.FromResult(0);
-        }
-
-        public virtual Task<string> GetPhoneNumberAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            return Task.FromResult(user.PhoneNumber);
-        }
-
-        public virtual Task<bool> GetPhoneNumberConfirmedAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            return Task.FromResult(user.PhoneNumberConfirmed);
-        }
-
-        public virtual Task SetPhoneNumberAsync(TUser user, string phoneNumber, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.PhoneNumber = phoneNumber;
-            return Task.FromResult(0);
-        }
-
-        public virtual Task SetPhoneNumberConfirmedAsync(TUser user, bool confirmed, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.PhoneNumberConfirmed = confirmed;
-            return Task.FromResult(0);
-        }
-
-        public virtual Task<bool> GetTwoFactorEnabledAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            return Task.FromResult(user.TwoFactorEnabled);
-        }
-
-        public virtual Task SetTwoFactorEnabledAsync(TUser user, bool enabled, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ThrowIfDisposed();
-            if (user == null)
-            {
-                throw new ArgumentNullException(nameof(user));
-            }
-            user.TwoFactorEnabled = enabled;
-            return Task.FromResult(0);
         }
 
         private Task<TUser> GetUserAggregateAsync(Expression<Func<TUser, bool>> filter)

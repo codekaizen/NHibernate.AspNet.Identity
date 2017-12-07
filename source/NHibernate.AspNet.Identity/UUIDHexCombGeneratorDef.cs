@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using NHibernate.Mapping.ByCode;
 
 namespace NHibernate.AspNet.Identity
@@ -10,7 +10,7 @@ namespace NHibernate.AspNet.Identity
         public UUIDHexCombGeneratorDef(string format)
         {
             if (format == null)
-                throw new ArgumentNullException("format");
+                throw new ArgumentNullException(nameof(format));
 
             param = new { format = format };
         }

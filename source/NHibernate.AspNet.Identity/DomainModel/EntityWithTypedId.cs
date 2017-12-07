@@ -7,7 +7,7 @@ namespace NHibernate.AspNet.Identity.DomainModel
     using System.Xml.Serialization;
 
     using System.ComponentModel.DataAnnotations;
-
+    
     /// <summary>
     ///     For a discussion of this object, see 
     ///     http://devlicio.us/blogs/billy_mccafferty/archive/2007/04/25/using-equals-gethashcode-effectively.aspx
