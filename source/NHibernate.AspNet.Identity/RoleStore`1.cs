@@ -1,13 +1,12 @@
-﻿using System;
+using System;
 using System.Linq;
-using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNet.Identity;
-using NHibernate.Linq;
+using Microsoft.AspNetCore.Identity;
 
 namespace NHibernate.AspNet.Identity
 {
-    public class RoleStore<TRole> : IQueryableRoleStore<TRole>, IRoleStore<TRole>, IDisposable where TRole : IdentityRole
+    public class RoleStore<TRole> : IQueryableRoleStore<TRole> where TRole : IdentityRole
     {
         private bool _disposed;
 
@@ -21,54 +20,116 @@ namespace NHibernate.AspNet.Identity
         public RoleStore(ISession context)
         {
             if (context == null)
-                throw new ArgumentNullException("context");
+                throw new ArgumentNullException(nameof(context));
 
             ShouldDisposeSession = true;
             this.Context = context;
         }
 
-        public virtual Task<TRole> FindByIdAsync(string roleId)
+        public virtual Task<TRole> FindByIdAsync(string roleId, CancellationToken cancellationToken = default(CancellationToken))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             return Task.FromResult(Context.Get<TRole>((object)roleId));
         }
 
-        public virtual Task<TRole> FindByNameAsync(string roleName)
+        public virtual Task<TRole> FindByNameAsync(string roleName, CancellationToken cancellationToken = default(CancellationToken))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
-            return Task.FromResult<TRole>(Queryable.FirstOrDefault<TRole>(Queryable.Where<TRole>(this.Context.Query<TRole>(), (Expression<Func<TRole, bool>>)(u => u.Name.ToUpper() == roleName.ToUpper()))));
+            return Task.FromResult(this.Context.Query<TRole>().FirstOrDefault(u => u.Name.ToUpper() == roleName.ToUpper()));
         }
 
-        public virtual  Task CreateAsync(TRole role)
+        public virtual Task<IdentityResult> CreateAsync(TRole role, CancellationToken cancellationToken = default(CancellationToken))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if ((object)role == null)
-                throw new ArgumentNullException("role");
+                throw new ArgumentNullException(nameof(role));
             Context.Save(role);
             Context.Flush();
-            return Task.FromResult(0);
+            return Task.FromResult(IdentityResult.Success);
         }
 
-        public virtual Task DeleteAsync(TRole role)
+        public virtual Task<IdentityResult> DeleteAsync(TRole role, CancellationToken cancellationToken = default(CancellationToken))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
             if (role == null)
-            {
-                throw new ArgumentNullException("role");
-            }
+                throw new ArgumentNullException(nameof(role));
+
             Context.Delete(role);
             Context.Flush();
-            return Task.FromResult(0);
+            return Task.FromResult(IdentityResult.Success);
         }
 
-        public virtual Task UpdateAsync(TRole role)
+        public Task<string> GetRoleIdAsync(TRole role, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            this.ThrowIfDisposed();
+            if (role == null)
+                throw new ArgumentNullException(nameof(role));
+
+            return Task.FromResult(role.Id);
+        }
+
+        public async Task<string> GetRoleNameAsync(TRole role, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfDisposed();
+
+            if (role == null)
+                throw new ArgumentNullException(nameof(role));
+
+            if (role.Name != null)
+                return role.Name;
+
+            var roleName = ((TRole)await Context.GetAsync(typeof(TRole), role.Id, cancellationToken)).Name;
+            return roleName;
+        }
+
+        public Task SetRoleNameAsync(TRole role, string roleName, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfDisposed();
+            if (role == null)
+                throw new ArgumentNullException(nameof(role));
+
+            role.Name = roleName;
+            return Task.CompletedTask;
+        }
+
+        public Task SetNormalizedRoleNameAsync(TRole role, string normalizedName, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfDisposed();
+            if (role == null)
+                throw new ArgumentNullException(nameof(role));
+            role.NormalizedName = normalizedName;
+            return Task.CompletedTask;
+        }
+
+        public async Task<string> GetNormalizedRoleNameAsync(TRole role, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfDisposed();
+            if (role == null)
+                throw new ArgumentNullException(nameof(role));
+            if (role.NormalizedName != null)
+                return role.NormalizedName;
+
+            var normalizedName = ((TRole)await Context.GetAsync(typeof(TRole), role.Id, cancellationToken)).NormalizedName;
+            return normalizedName;
+        }
+
+        public virtual Task<IdentityResult> UpdateAsync(TRole role, CancellationToken cancellationToken = default(CancellationToken))
         {
             this.ThrowIfDisposed();
             if ((object)role == null)
-                throw new ArgumentNullException("role");
+                throw new ArgumentNullException(nameof(role));
             Context.Update(role);
             Context.Flush();
-            return Task.FromResult(0);
+            return Task.FromResult(IdentityResult.Success);
         }
 
         private void ThrowIfDisposed()

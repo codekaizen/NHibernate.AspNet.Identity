@@ -1,12 +1,8 @@
-﻿using NHibernate.AspNet.Identity.DomainModel;
+using Microsoft.AspNetCore.Identity;
 
 namespace NHibernate.AspNet.Identity
 {
-    public class IdentityUserLogin : ValueObject
+    public class IdentityUserLogin : IdentityUserLogin<string>
     {
-        public virtual string LoginProvider { get; set; }
-
-        public virtual string ProviderKey { get; set; }
-
     }
 }

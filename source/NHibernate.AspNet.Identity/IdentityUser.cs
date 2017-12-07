@@ -1,13 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using Microsoft.AspNet.Identity;
 using NHibernate.AspNet.Identity.DomainModel;
 using NHibernate.Mapping.ByCode;
 using NHibernate.Mapping.ByCode.Conformist;
 
 namespace NHibernate.AspNet.Identity
 {
-    public class IdentityUser : EntityWithTypedId<string>, IUser
+    public class IdentityUser : EntityWithTypedId<string>
     {
         public virtual int AccessFailedCount { get; set; }
 

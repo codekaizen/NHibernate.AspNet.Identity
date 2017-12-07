@@ -1,12 +1,11 @@
-﻿using System.Collections.Generic;
-using Microsoft.AspNet.Identity;
+using System.Collections.Generic;
 using NHibernate.AspNet.Identity.DomainModel;
 using NHibernate.Mapping.ByCode;
 using NHibernate.Mapping.ByCode.Conformist;
 
 namespace NHibernate.AspNet.Identity
 {
-    public class IdentityRole : EntityWithTypedId<string>, IRole
+    public class IdentityRole : EntityWithTypedId<string>
     {
         public virtual string Name { get; set; }
 

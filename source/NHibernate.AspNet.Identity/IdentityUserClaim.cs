@@ -1,15 +1,11 @@
-﻿using NHibernate.AspNet.Identity.DomainModel;
+using Microsoft.AspNetCore.Identity;
 using NHibernate.Mapping.ByCode;
 using NHibernate.Mapping.ByCode.Conformist;
 
 namespace NHibernate.AspNet.Identity
 {
-    public class IdentityUserClaim : EntityWithTypedId<int>
+    public class IdentityUserClaim : IdentityUserClaim<string>
     {
-        public virtual string ClaimType { get; set; }
-
-        public virtual string ClaimValue { get; set; }
-
         public virtual IdentityUser User { get; set; }
     }
 
