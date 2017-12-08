@@ -1,15 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Transactions;
-using Microsoft.AspNetCore.Identity;B
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NHibernate.AspNet.Identity.Tests.Models;
-using NHibernate.Linq;
 using NUnit.Framework;
 using TestClass = NUnit.Framework.TestFixtureAttribute;
 using TestInitialize = NUnit.Framework.SetUpAttribute;
@@ -23,6 +21,7 @@ namespace NHibernate.AspNet.Identity.Tests
     {
         private ISession _session;
         private UserManager<ApplicationUser> _userManager;
+        private RoleManager<IdentityRole> _roleManager;
 
         [TestInitialize]
         public void Initialize()
@@ -31,7 +30,8 @@ namespace NHibernate.AspNet.Identity.Tests
             _session = factory.OpenSession();
             SessionFactoryProvider.Instance.BuildSchema();
             var serviceProviderMock = new Mock<IServiceProvider>();
-            
+
+            var loggerFactory = new LoggerFactory();
             _userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(_session),
                 new OptionsManager<IdentityOptions>(new OptionsFactory<IdentityOptions>(new IConfigureOptions<IdentityOptions>[0], new IPostConfigureOptions<IdentityOptions>[0])),
                 new PasswordHasher<ApplicationUser>(new OptionsManager<PasswordHasherOptions>(new OptionsFactory<PasswordHasherOptions>(new IConfigureOptions<PasswordHasherOptions>[0], new IPostConfigureOptions<PasswordHasherOptions>[0]))),
@@ -40,7 +40,12 @@ namespace NHibernate.AspNet.Identity.Tests
                 new UpperInvariantLookupNormalizer(),
                 new IdentityErrorDescriber(),
                 serviceProviderMock.Object,
-                new Logger<UserManager<ApplicationUser>>(new LoggerFactory()));
+                new Logger<UserManager<ApplicationUser>>(loggerFactory));
+            _roleManager = new RoleManager<IdentityRole>(new RoleStore<IdentityRole>(_session),
+                new IRoleValidator<IdentityRole>[0],
+                new UpperInvariantLookupNormalizer(),
+                new IdentityErrorDescriber(),
+                new Logger<RoleManager<IdentityRole>>(loggerFactory));
         }
 
         [TestCleanup]
@@ -107,7 +112,7 @@ namespace NHibernate.AspNet.Identity.Tests
 
             using (var transaction = new TransactionScope())
             {
-                var result = userManager.CreateAsync(user, "RealPassword").GetAwaiter().GetResult();
+                var result = _userManager.CreateAsync(user, "RealPassword").GetAwaiter().GetResult();
                 transaction.Complete();
                 Assert.AreEqual(0, result.Errors.Count());
             }
@@ -233,47 +238,43 @@ namespace NHibernate.AspNet.Identity.Tests
         [TestMethod]
         public async Task LockoutAccount()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(this._session));
-            userManager.MaxFailedAccessAttemptsBeforeLockout = 3;
-            userManager.UserLockoutEnabledByDefault = true;
-            userManager.DefaultAccountLockoutTimeSpan = new TimeSpan(0, 10, 0);
-            userManager.Create(new ApplicationUser() { UserName = "test", LockoutEnabled = true }, "Welcome");
-            var user = userManager.Find("test", "Welcome");
-            Assert.AreEqual(0, userManager.GetAccessFailedCount(user.Id));
-            userManager.AccessFailed(user.Id);
-            Assert.AreEqual(1, userManager.GetAccessFailedCount(user.Id));
-            userManager.AccessFailed(user.Id);
-            Assert.AreEqual(2, userManager.GetAccessFailedCount(user.Id));
-            userManager.AccessFailed(user.Id);
-            Assert.IsTrue(userManager.IsLockedOut(user.Id));
+            _userManager.Options.Lockout.MaxFailedAccessAttempts = 3;
+            _userManager.Options.Lockout.AllowedForNewUsers = true;
+            _userManager.Options.Lockout.DefaultLockoutTimeSpan = new TimeSpan(0, 10, 0);
+            await _userManager.CreateAsync(new ApplicationUser { UserName = "test", LockoutEnabled = true }, "Welcome");
+            var user = await _userManager.FindByNameAsync("test");
+            Assert.AreEqual(0, await _userManager.GetAccessFailedCountAsync(user));
+            await _userManager.AccessFailedAsync(user);
+            Assert.AreEqual(1, await _userManager.GetAccessFailedCountAsync(user));
+            await _userManager.AccessFailedAsync(user);
+            Assert.AreEqual(2, await _userManager.GetAccessFailedCountAsync(user));
+            await _userManager.AccessFailedAsync(user);
+            Assert.IsTrue(await _userManager.IsLockedOutAsync(user));
         }
 
         [TestMethod]
         public async Task FindByName()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(this._session));
-            userManager.Create(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
-            var x = userManager.FindByName("tEsT");
+            await _userManager.CreateAsync(new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
+            var x = await _userManager.FindByNameAsync("tEsT");
             Assert.IsNotNull(x);
-            Assert.IsTrue(userManager.IsEmailConfirmed(x.Id));
+            Assert.IsTrue(await _userManager.IsEmailConfirmedAsync(x));
         }
 
         [TestMethod]
         public async Task FindByNameWithRoles()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(this._session));
-            var roleManager = new RoleManager<IdentityRole>(new RoleStore<IdentityRole>(this._session));
-            roleManager.Create(new IdentityRole("Admin"));
-            roleManager.Create(new IdentityRole("AO"));
+            await _roleManager.CreateAsync(new IdentityRole("Admin"));
+            await _roleManager.CreateAsync(new IdentityRole("AO"));
             var user = new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true };
-            userManager.Create(user, "Welcome");
-            userManager.AddToRole(user.Id, "Admin");
-            userManager.AddToRole(user.Id, "AO");
+            await _userManager.CreateAsync(user, "Welcome");
+            await _userManager.AddToRoleAsync(user, "Admin");
+            await _userManager.AddToRoleAsync(user, "AO");
             // clear session
             this._session.Flush();
             this._session.Clear();
 
-            var x = userManager.FindByName("tEsT");
+            var x = await _userManager.FindByNameAsync("tEsT");
             Assert.IsNotNull(x);
             Assert.AreEqual(2, x.Roles.Count);
         }
@@ -281,48 +282,43 @@ namespace NHibernate.AspNet.Identity.Tests
         [TestMethod]
         public async Task FindByEmail()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(this._session));
-            userManager.Create(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
-            var x = userManager.FindByEmail("AaA@bBb.com");
+            await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
+            var x = await _userManager.FindByEmailAsync("AaA@bBb.com");
             Assert.IsNotNull(x);
-            Assert.IsTrue(userManager.IsEmailConfirmed(x.Id));
+            Assert.IsTrue(await _userManager.IsEmailConfirmedAsync(x));
         }
 
         [TestMethod]
         public async Task AddClaim()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(this._session));
             var user = new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true };
-            userManager.Create(user, "Welcome");
-            userManager.AddClaim(user.Id, new Claim(ClaimTypes.Role, "Admin"));
-            Assert.AreEqual(1, userManager.GetClaims(user.Id).Count());
+            await _userManager.CreateAsync(user, "Welcome");
+            await _userManager.AddClaimAsync(user, new Claim(ClaimTypes.Role, "Admin"));
+            Assert.AreEqual(1, (await _userManager.GetClaimsAsync(user)).Count());
         }
 
         [TestMethod]
         public async Task EmailConfirmationToken()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(this._session));
-            userManager.UserTokenProvider = new EmailTokenProvider<ApplicationUser, string>() { BodyFormat = "xxxx {0}", Subject = "Reset password" };
-            userManager.Create(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = false }, "Welcome");
-            var x = userManager.FindByEmail("aaa@bbb.com");
-            string token = userManager.GeneratePasswordResetToken(x.Id);
-            userManager.ResetPassword(x.Id, token, "Welcome!");
+            _userManager.UserTokenProvider = new EmailTokenProvider<ApplicationUser, string> { BodyFormat = "xxxx {0}", Subject = "Reset password" };
+            await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = false }, "Welcome");
+            var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
+            var token = await _userManager.GeneratePasswordResetTokenAsync(x);
+            await _userManager.ResetPasswordAsync(x, token, "Welcome!");
         }
 
         [TestMethod]
         public async Task FindByEmailAggregated()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(this._session));
-            var roleManager = new RoleManager<IdentityRole>(new RoleStore<IdentityRole>(this._session));
-            userManager.Create(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
-            var x = userManager.FindByEmail("aaa@bbb.com");
-            roleManager.CreateAsync(new IdentityRole("Admin"));
-            userManager.AddClaim(x.Id, new Claim("role", "admin"));
-            userManager.AddClaim(x.Id, new Claim("role", "user"));
-            userManager.AddToRole(x.Id, "Admin");
-            userManager.AddLogin(x.Id, new UserLoginInfo("facebook", "1234"));
+            await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
+            var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
+            await _roleManager.CreateAsync(new IdentityRole("Admin"));
+            await _userManager.AddClaimAsync(x, new Claim("role", "admin"));
+            await _userManager.AddClaimAsync(x, new Claim("role", "user"));
+            await _userManager.AddToRoleAsync(x, "Admin");
+            await _userManager.AddLoginAsync(x, new UserLoginInfo("facebook", "1234"));
             this._session.Clear();
-            x = userManager.FindByEmail("aaa@bbb.com");
+            x = await _userManager.FindByEmailAsync("aaa@bbb.com");
             Assert.IsNotNull(x);
             Assert.AreEqual(2, x.Claims.Count);
             Assert.AreEqual(1, x.Roles.Count);
@@ -332,40 +328,36 @@ namespace NHibernate.AspNet.Identity.Tests
         [TestMethod]
         public async Task CreateWithoutCommitingTransactionScopeShouldNotInsertRows()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(this._session));
-            var roleManager = new RoleManager<IdentityRole>(new RoleStore<IdentityRole>(this._session));
             using (var ts = new TransactionScope(TransactionScopeOption.RequiresNew))
             {
                 // session is not opened inside the scope so we need to enlist it manually
                 ((System.Data.Common.DbConnection)_session.Connection).EnlistTransaction(System.Transactions.Transaction.Current);
-                userManager.Create(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome1");
-                var x = userManager.FindByEmail("aaa@bbb.com");
-                roleManager.Create(new IdentityRole("Admin"));
-                userManager.AddClaim(x.Id, new Claim("role", "admin"));
-                userManager.AddClaim(x.Id, new Claim("role", "user"));
-                userManager.AddToRole(x.Id, "Admin");
-                userManager.AddLogin(x.Id, new UserLoginInfo("facebook", "1234"));
+                await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome1");
+                var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
+                await _roleManager.CreateAsync(new IdentityRole("Admin"));
+                await _userManager.AddClaimAsync(x, new Claim("role", "admin"));
+                await _userManager.AddClaimAsync(x, new Claim("role", "user"));
+                await _userManager.AddToRoleAsync(x, "Admin");
+                await _userManager.AddLoginAsync(x, new UserLoginInfo("facebook", "1234"));
             }
-            var x2 = userManager.FindByEmail("aaa@bbb.com");
+            var x2 = await _userManager.FindByEmailAsync("aaa@bbb.com");
             Assert.IsNull(x2);
         }
 
         [TestMethod]
         public async Task CreateWithoutCommitingNHibernateTransactionShouldNotInsertRows()
         {
-            var userManager = new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(this._session));
-            var roleManager = new RoleManager<IdentityRole>(new RoleStore<IdentityRole>(this._session));
             using (var ts = _session.BeginTransaction())
             {
-                userManager.Create(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome1");
-                var x = userManager.FindByEmail("aaa@bbb.com");
-                roleManager.Create(new IdentityRole("Admin"));
-                userManager.AddClaim(x.Id, new Claim("role", "admin"));
-                userManager.AddClaim(x.Id, new Claim("role", "user"));
-                userManager.AddToRole(x.Id, "Admin");
-                userManager.AddLogin(x.Id, new UserLoginInfo("facebook", "1234"));
+                await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome1");
+                var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
+                await _roleManager.CreateAsync(new IdentityRole("Admin"));
+                await _userManager.AddClaimAsync(x, new Claim("role", "admin"));
+                await _userManager.AddClaimAsync(x, new Claim("role", "user"));
+                await _userManager.AddToRoleAsync(x, "Admin");
+                await _userManager.AddLoginAsync(x, new UserLoginInfo("facebook", "1234"));
             }
-            var x2 = userManager.FindByEmail("aaa@bbb.com");
+            var x2 = await _userManager.FindByEmailAsync("aaa@bbb.com");
             Assert.IsNull(x2);
         }
     }
