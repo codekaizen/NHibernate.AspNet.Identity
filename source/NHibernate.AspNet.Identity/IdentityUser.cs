@@ -29,30 +29,56 @@ namespace NHibernate.AspNet.Identity
             this.UserName = userName;
         }
 
-        public void AddToken(IdentityUserToken<string> token)
+        public virtual void AddToken(IdentityUserToken<string> token)
         {
-            if (token == null)
-                throw new ArgumentNullException(nameof(token));
-
-            var userToken = new IdentityUserToken
-            {
-                UserId = token.UserId,
-                Name = token.Name,
-                LoginProvider = token.LoginProvider,
-                Value = token.Value
-            };
-
             EnsureTokensCollection();
-            this.Tokens.Add(userToken);
+            AddToCollection<IdentityUserToken>(this.Tokens, token);
         }
 
-        public bool RemoveToken(IdentityUserToken<string> token)
+        public virtual bool RemoveToken(IdentityUserToken<string> token)
         {
-            if (token == null)
-                throw new ArgumentNullException(nameof(token));
+            return RemoveFromCollection(this.Tokens, token);
+        }
 
-            var toRemove = this.Tokens?.SingleOrDefault(t => t.Equals(token));
-            return toRemove != null && this.Tokens.Remove(toRemove);
+        public virtual void AddRole(IdentityRole role)
+        {
+            EnsureRolesCollection();
+            AddToCollection(this.Roles, role);
+        }
+
+        public virtual bool RemoveRole(IdentityRole role)
+        {
+            return RemoveFromCollection(this.Roles, role);
+        }
+
+        public virtual void AddClaim(IdentityUserClaim claim)
+        {
+            EnsureClaimsCollection();
+            AddToCollection(this.Claims, claim);
+        }
+
+        public virtual bool RemoveClaim(IdentityUserLogin claim)
+        {
+            return RemoveFromCollection(this.Claims, claim);
+        }
+
+        public virtual void AddLogin(IdentityUserLogin login)
+        {
+            EnsureLoginsCollection();
+            AddToCollection(this.Logins, login);
+        }
+
+        public virtual bool RemoveLogin(IdentityUserLogin login)
+        {
+            RemoveFromCollection(this.Logins, login);
+        }
+
+        private void EnsureLoginsCollection()
+        {
+            if (this.Logins == null)
+            {
+                this.Logins = new List<IdentityUserLogin>();
+            }
         }
 
         private void EnsureTokensCollection()
@@ -63,7 +89,44 @@ namespace NHibernate.AspNet.Identity
             }
         }
 
-        internal void AddRole(IdentityRole roleEntity) => throw new NotImplementedException();
+        private void EnsureRolesCollection()
+        {
+            if (this.Roles == null)
+            {
+                this.Roles = new List<IdentityRole>();
+            }
+        }
+
+        private void EnsureClaimsCollection()
+        {
+            if (this.Claims == null)
+            {
+                this.Claims = new List<IdentityUserClaim>();
+            }
+        }
+
+        private void AddToCollection<T>(ICollection<T> collection, T item)
+        {
+            if (collection == null)
+                throw new ArgumentNullException(nameof(collection));
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+
+            if (!collection.Contains(item))
+            {
+                collection.Add(item);
+            }
+        }
+
+        private bool RemoveFromCollection<T>(ICollection<T> collection, T item)
+            where T : class
+        {
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+
+            var toRemove = collection?.SingleOrDefault(i => i.Equals(item));
+            return toRemove != null && (collection?.Remove(toRemove)).GetValueOrDefault();
+        }
     }
 
     public class IdentityUserMap : ClassMapping<IdentityUser>

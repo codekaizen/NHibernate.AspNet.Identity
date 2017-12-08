@@ -108,7 +108,7 @@ namespace NHibernate.AspNet.Identity.Tests
         [TestMethod]
         public void WhenCreateUserAsync()
         {
-            var user = new ApplicationUser() { UserName = "RealUserName" };
+            var user = new ApplicationUser { UserName = "RealUserName" };
 
             using (var transaction = new TransactionScope())
             {
@@ -266,7 +266,7 @@ namespace NHibernate.AspNet.Identity.Tests
         {
             await _roleManager.CreateAsync(new IdentityRole("Admin"));
             await _roleManager.CreateAsync(new IdentityRole("AO"));
-            var user = new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true };
+            var user = new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true };
             await _userManager.CreateAsync(user, "Welcome");
             await _userManager.AddToRoleAsync(user, "Admin");
             await _userManager.AddToRoleAsync(user, "AO");
@@ -282,7 +282,7 @@ namespace NHibernate.AspNet.Identity.Tests
         [TestMethod]
         public async Task FindByEmail()
         {
-            await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
+            await _userManager.CreateAsync(new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
             var x = await _userManager.FindByEmailAsync("AaA@bBb.com");
             Assert.IsNotNull(x);
             Assert.IsTrue(await _userManager.IsEmailConfirmedAsync(x));
@@ -291,17 +291,18 @@ namespace NHibernate.AspNet.Identity.Tests
         [TestMethod]
         public async Task AddClaim()
         {
-            var user = new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true };
+            var user = new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true };
             await _userManager.CreateAsync(user, "Welcome");
             await _userManager.AddClaimAsync(user, new Claim(ClaimTypes.Role, "Admin"));
-            Assert.AreEqual(1, (await _userManager.GetClaimsAsync(user)).Count());
+            Assert.AreEqual(1, (await _userManager.GetClaimsAsync(user)).Count);
         }
 
         [TestMethod]
         public async Task EmailConfirmationToken()
         {
-            _userManager.UserTokenProvider = new EmailTokenProvider<ApplicationUser, string> { BodyFormat = "xxxx {0}", Subject = "Reset password" };
-            await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = false }, "Welcome");
+            var tokenProvider = new EmailTokenProvider<ApplicationUser>();
+            _userManager.RegisterTokenProvider("Email Provider", tokenProvider);
+            await _userManager.CreateAsync(new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = false }, "Welcome");
             var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
             var token = await _userManager.GeneratePasswordResetTokenAsync(x);
             await _userManager.ResetPasswordAsync(x, token, "Welcome!");
@@ -310,13 +311,13 @@ namespace NHibernate.AspNet.Identity.Tests
         [TestMethod]
         public async Task FindByEmailAggregated()
         {
-            await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
+            await _userManager.CreateAsync(new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome");
             var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
             await _roleManager.CreateAsync(new IdentityRole("Admin"));
             await _userManager.AddClaimAsync(x, new Claim("role", "admin"));
             await _userManager.AddClaimAsync(x, new Claim("role", "user"));
             await _userManager.AddToRoleAsync(x, "Admin");
-            await _userManager.AddLoginAsync(x, new UserLoginInfo("facebook", "1234"));
+            await _userManager.AddLoginAsync(x, new UserLoginInfo("facebook", "1234", "Facebook"));
             this._session.Clear();
             x = await _userManager.FindByEmailAsync("aaa@bbb.com");
             Assert.IsNotNull(x);
@@ -332,13 +333,13 @@ namespace NHibernate.AspNet.Identity.Tests
             {
                 // session is not opened inside the scope so we need to enlist it manually
                 ((System.Data.Common.DbConnection)_session.Connection).EnlistTransaction(System.Transactions.Transaction.Current);
-                await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome1");
+                await _userManager.CreateAsync(new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome1");
                 var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
                 await _roleManager.CreateAsync(new IdentityRole("Admin"));
                 await _userManager.AddClaimAsync(x, new Claim("role", "admin"));
                 await _userManager.AddClaimAsync(x, new Claim("role", "user"));
                 await _userManager.AddToRoleAsync(x, "Admin");
-                await _userManager.AddLoginAsync(x, new UserLoginInfo("facebook", "1234"));
+                await _userManager.AddLoginAsync(x, new UserLoginInfo("facebook", "1234", "Facebook"));
             }
             var x2 = await _userManager.FindByEmailAsync("aaa@bbb.com");
             Assert.IsNull(x2);
@@ -349,13 +350,13 @@ namespace NHibernate.AspNet.Identity.Tests
         {
             using (var ts = _session.BeginTransaction())
             {
-                await _userManager.CreateAsync(new ApplicationUser() { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome1");
+                await _userManager.CreateAsync(new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome1");
                 var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
                 await _roleManager.CreateAsync(new IdentityRole("Admin"));
                 await _userManager.AddClaimAsync(x, new Claim("role", "admin"));
                 await _userManager.AddClaimAsync(x, new Claim("role", "user"));
                 await _userManager.AddToRoleAsync(x, "Admin");
-                await _userManager.AddLoginAsync(x, new UserLoginInfo("facebook", "1234"));
+                await _userManager.AddLoginAsync(x, new UserLoginInfo("facebook", "1234", "Facebook"));
             }
             var x2 = await _userManager.FindByEmailAsync("aaa@bbb.com");
             Assert.IsNull(x2);

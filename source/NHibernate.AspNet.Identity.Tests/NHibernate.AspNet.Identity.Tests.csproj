@@ -138,7 +138,7 @@
   </Choose>
   <ItemGroup>
     <Compile Include="Models\Foo.cs" />
-    <Compile Include="Models\IdentityModels.cs" />
+    <Compile Include="Models\ApplicationUser.cs" />
     <Compile Include="UserStoreTest.cs" />
     <Compile Include="MapTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

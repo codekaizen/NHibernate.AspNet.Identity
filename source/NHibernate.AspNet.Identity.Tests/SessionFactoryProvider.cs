@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using NHibernate.AspNet.Identity.DomainModel;
@@ -13,11 +13,10 @@ namespace NHibernate.AspNet.Identity.Tests
     {
         private static volatile SessionFactoryProvider _instance;
         private static object _syncRoot = new Object();
-
         private Configuration _configuration;
 
-        public ISessionFactory SessionFactory { get; private set; }
-        public string Name { get; private set; }
+        public ISessionFactory SessionFactory { get; }
+        public string Name { get; }
 
         /// <summary>
         /// constructor configures a SessionFactory based on the configuration passed in
@@ -37,17 +36,19 @@ namespace NHibernate.AspNet.Identity.Tests
                 typeof(ApplicationUser), 
                 typeof(IdentityRole), 
                 typeof(IdentityUserLogin), 
-                typeof(IdentityUserClaim), 
-                typeof(Foo), 
+                typeof(IdentityUserClaim),
+                typeof(IdentityUserToken),
             };
 
-            var mapper = new ConventionModelMapper();
-            DefineBaseClass(mapper, baseEntityToIgnore);
-            mapper.IsComponent((type, declared) => typeof(ValueObject).IsAssignableFrom(type));
+            var mapper = new ModelMapper();
+            //DefineBaseClass(mapper, baseEntityToIgnore);
+            //mapper.IsComponent((type, declared) => typeof(ValueObject).IsAssignableFrom(type));
 
+            mapper.AddMapping<ApplicationUserMap>();
             mapper.AddMapping<IdentityUserMap>();
             mapper.AddMapping<IdentityRoleMap>();
             mapper.AddMapping<IdentityUserClaimMap>();
+            mapper.AddMapping<IdentityUserTokenMap>();
 
             var mapping = mapper.CompileMappingForEach(allEntities);
 
@@ -91,15 +92,16 @@ namespace NHibernate.AspNet.Identity.Tests
                 .Create(true, true /* DROP AND CREATE SCHEMA */);
         }
 
-        private static void DefineBaseClass(ConventionModelMapper mapper, System.Type[] baseEntityToIgnore)
-        {
-            if (baseEntityToIgnore == null) return;
-            mapper.IsEntity((type, declared) =>
-                baseEntityToIgnore.Any(x => x.IsAssignableFrom(type)) &&
-                !baseEntityToIgnore.Any(x => x == type) &&
-                !type.IsInterface);
-            mapper.IsRootEntity((type, declared) => baseEntityToIgnore.Any(x => x == type.BaseType));
-        }
+        //private static void DefineBaseClass(ConventionModelMapper mapper, System.Type[] baseEntityToIgnore)
+        //{
+        //    if (baseEntityToIgnore == null)
+        //        return;
+        //    mapper.IsEntity((type, declared) =>
+        //        baseEntityToIgnore.Any(x => x.IsAssignableFrom(type)) &&
+        //        baseEntityToIgnore.All(x => x != type) &&
+        //        !type.IsInterface);
+        //    mapper.IsRootEntity((type, declared) => baseEntityToIgnore.Any(x => x == type.BaseType));
+        //}
 
     }
 }
