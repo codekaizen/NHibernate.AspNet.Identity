@@ -1,7 +1,7 @@
 using NHibernate.Cfg.MappingSchema;
 using NHibernate.Mapping.ByCode;
 
-namespace NHibernate.AspNet.Identity.Helpers
+namespace NHibernate.AspNet.Identity
 {
     public static class MappingHelper
     {
@@ -13,7 +13,6 @@ namespace NHibernate.AspNet.Identity.Helpers
         /// <returns></returns>
         public static HbmMapping GetIdentityMappings(System.Type[] additionalTypes)
         {
-
             var allEntities = new[] {
                 typeof(IdentityUser),
                 typeof(IdentityRole),
@@ -23,7 +22,6 @@ namespace NHibernate.AspNet.Identity.Helpers
             };
 
             var mapper = new ModelMapper();
-            
             mapper.AddMapping<IdentityUserMap>();
             mapper.AddMapping<IdentityRoleMap>();
             mapper.AddMapping<IdentityUserClaimMap>();

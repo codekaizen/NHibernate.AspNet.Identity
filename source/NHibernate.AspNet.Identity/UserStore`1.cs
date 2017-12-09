@@ -177,26 +177,7 @@ namespace NHibernate.AspNet.Identity
                 await this.Context.FlushAsync(cancellationToken);
             }
         }
-
-        //public virtual Task RemoveLoginAsync(TUser user, UserLoginInfo login, CancellationToken cancellationToken = default(CancellationToken))
-        //{
-        //    cancellationToken.ThrowIfCancellationRequested();
-        //    this.ThrowIfDisposed();
-        //    if (user == null)
-        //        throw new ArgumentNullException(nameof(user));
-        //    if (login == null)
-        //        throw new ArgumentNullException(nameof(login));
-
-        //    var info = user.Logins.SingleOrDefault(x => x.LoginProvider == login.LoginProvider && x.ProviderKey == login.ProviderKey);
-        //    if (info != null)
-        //    {
-        //        user.Logins.Remove(info);
-        //        this.Context.Update(user);
-        //    }
-
-        //    return Task.FromResult(0);
-        //}
-
+        
         public override Task<IList<UserLoginInfo>> GetLoginsAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -336,60 +317,6 @@ namespace NHibernate.AspNet.Identity
             await this.Context.FlushAsync();
         }
 
-        //public virtual Task AddClaimAsync(TUser user, Claim claim, CancellationToken cancellationToken = default(CancellationToken))
-        //{
-        //    cancellationToken.ThrowIfCancellationRequested();
-        //    this.ThrowIfDisposed();
-        //    if (user == null)
-        //    {
-        //        throw new ArgumentNullException(nameof(user));
-        //    }
-        //    if (claim == null)
-        //    {
-        //        throw new ArgumentNullException(nameof(claim));
-        //    }
-
-        //    user.Claims.Add(new IdentityUserClaim()
-        //    {
-        //        User = user,
-        //        ClaimType = claim.Type,
-        //        ClaimValue = claim.Value
-        //    });
-
-        //    return Task.FromResult(0);
-        //}
-
-        //public virtual Task RemoveClaimAsync(TUser user, Claim claim, CancellationToken cancellationToken = default(CancellationToken))
-        //{
-        //    cancellationToken.ThrowIfCancellationRequested();
-        //    this.ThrowIfDisposed();
-        //    if (user == null)
-        //    {
-        //        throw new ArgumentNullException(nameof(user));
-        //    }
-        //    if (claim == null)
-        //    {
-        //        throw new ArgumentNullException(nameof(claim));
-        //    }
-
-        //    foreach (var identityUserClaim in Enumerable.ToList(Enumerable.Where(user.Claims, uc =>
-        //    {
-        //        if (uc.ClaimValue == claim.Value)
-        //        {
-        //            return uc.ClaimType == claim.Type;
-        //        }
-        //        else
-        //        {
-        //            return false;
-        //        }
-        //    })))
-        //    {
-        //        user.Claims.Remove(identityUserClaim);
-        //    }
-
-        //    return Task.FromResult(0);
-        //}
-
         public virtual async Task AddToRoleAsync(TUser user, string normalizedRoleName, CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -484,34 +411,6 @@ namespace NHibernate.AspNet.Identity
                 return this.Context.Query<TUser>();
             }
         }
-
-        //Task<DateTimeOffset?> IUserLockoutStore<TUser>.GetLockoutEndDateAsync(TUser user, CancellationToken cancellationToken)
-        //{
-        //    cancellationToken.ThrowIfCancellationRequested();
-        //    this.ThrowIfDisposed();
-        //    throw new NotImplementedException();
-        //}
-
-        //public virtual Task SetLockoutEndDateAsync(TUser user, DateTimeOffset lockoutEnd, CancellationToken cancellationToken = default(CancellationToken))
-        //{
-        //    DateTime? nullable;
-        //    cancellationToken.ThrowIfCancellationRequested();
-        //    this.ThrowIfDisposed();
-        //    if (user == null)
-        //    {
-        //        throw new ArgumentNullException(nameof(user));
-        //    }
-        //    if (lockoutEnd == DateTimeOffset.MinValue)
-        //    {
-        //        nullable = null;
-        //    }
-        //    else
-        //    {
-        //        nullable = new DateTime?(lockoutEnd.UtcDateTime);
-        //    }
-        //    user.LockoutEndDateUtc = nullable;
-        //    return Task.FromResult(0);
-        //}
 
         public override Task<TUser> FindByEmailAsync(string email, CancellationToken cancellationToken = default(CancellationToken))
         {

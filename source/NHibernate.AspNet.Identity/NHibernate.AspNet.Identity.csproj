@@ -94,16 +94,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DomainModel\BaseObject.cs" />
-    <Compile Include="DomainModel\BaseObjectEqualityComparer.cs" />
-    <Compile Include="DomainModel\DomainSignatureAttribute.cs" />
-    <Compile Include="DomainModel\Entity.cs" />
-    <Compile Include="DomainModel\EntityWithTypedId.cs" />
-    <Compile Include="DomainModel\IEntityWithTypedId.cs" />
-    <Compile Include="DomainModel\IHasAssignedId.cs" />
-    <Compile Include="DomainModel\ValidatableObject.cs" />
-    <Compile Include="DomainModel\ValueObject.cs" />
-    <Compile Include="Helpers\MappingHelper.cs" />
+    <Compile Include="IdentityRoleMap.cs" />
+    <Compile Include="MappingHelper.cs" />
     <Compile Include="IdentityRole.cs" />
     <Compile Include="IdentityUser.cs" />
     <Compile Include="IdentityUserClaim.cs">
@@ -114,6 +106,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="IdentityUserLoginMap.cs" />
+    <Compile Include="IdentityUserMap.cs" />
     <Compile Include="IdentityUserToken.cs" />
     <Compile Include="IdentityUserTokenMap.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

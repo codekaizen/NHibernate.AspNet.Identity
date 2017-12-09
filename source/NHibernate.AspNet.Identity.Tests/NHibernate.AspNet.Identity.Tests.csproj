@@ -137,6 +137,7 @@
     <Otherwise />
   </Choose>
   <ItemGroup>
+    <Compile Include="Models\ApplicationUserMap.cs" />
     <Compile Include="Models\Foo.cs" />
     <Compile Include="Models\ApplicationUser.cs" />
     <Compile Include="UserStoreTest.cs" />

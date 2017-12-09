@@ -17,6 +17,10 @@ namespace NHibernate.AspNet.Identity
                 map.Length(256);
                 map.NotNullable(true);
             });
+            this.Property(x => x.UserId, map =>
+            {
+                map.Length(40);
+            });
         }
     }
 }

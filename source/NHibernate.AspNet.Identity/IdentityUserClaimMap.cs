@@ -12,8 +12,7 @@ namespace NHibernate.AspNet.Identity
             {
                 table = "KeyPool",
                 column = "NextHigh",
-                max_lo = 100,
-                where = $"EntityName = '{nameof(IdentityUserClaim).ToLowerInvariant()}'"
+                max_lo = 100
             })));
             Property(x => x.ClaimType);
             Property(x => x.ClaimValue);
