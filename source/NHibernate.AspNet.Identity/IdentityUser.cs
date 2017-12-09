@@ -31,13 +31,19 @@ namespace NHibernate.AspNet.Identity
 
         public virtual void AddToken(IdentityUserToken<string> token)
         {
+            if (token == null)
+                throw new ArgumentNullException(nameof(token));
             EnsureTokensCollection();
-            AddToCollection<IdentityUserToken>(this.Tokens, token);
+            var modelToken = token as IdentityUserToken ?? new IdentityUserToken(token);
+            AddToCollection(this.Tokens, modelToken);
         }
 
         public virtual bool RemoveToken(IdentityUserToken<string> token)
         {
-            return RemoveFromCollection(this.Tokens, token);
+            if (token == null)
+                throw new ArgumentNullException(nameof(token));
+            var modelToken = token as IdentityUserToken ?? new IdentityUserToken(token);
+            return RemoveFromCollection(this.Tokens, modelToken);
         }
 
         public virtual void AddRole(IdentityRole role)
@@ -57,7 +63,7 @@ namespace NHibernate.AspNet.Identity
             AddToCollection(this.Claims, claim);
         }
 
-        public virtual bool RemoveClaim(IdentityUserLogin claim)
+        public virtual bool RemoveClaim(IdentityUserClaim claim)
         {
             return RemoveFromCollection(this.Claims, claim);
         }
@@ -70,7 +76,7 @@ namespace NHibernate.AspNet.Identity
 
         public virtual bool RemoveLogin(IdentityUserLogin login)
         {
-            RemoveFromCollection(this.Logins, login);
+            return RemoveFromCollection(this.Logins, login);
         }
 
         private void EnsureLoginsCollection()

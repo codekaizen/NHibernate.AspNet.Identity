@@ -33,6 +33,12 @@ namespace NHibernate.AspNet.Identity
                 map.NotNullable(true);
                 map.Unique(true);
             });
+            this.Property(x => x.NormalizedName, map =>
+            {
+                map.Length(255);
+                map.NotNullable(true);
+                map.Unique(true);
+            });
             this.Bag(x => x.Users, map =>
             {
                 map.Table("AspNetUserRoles");

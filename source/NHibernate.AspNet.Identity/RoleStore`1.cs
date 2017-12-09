@@ -30,7 +30,7 @@ namespace NHibernate.AspNet.Identity
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
-            return Task.FromResult(Context.Get<TRole>((object)roleId));
+            return Task.FromResult(Context.Get<TRole>(roleId));
         }
 
         public virtual Task<TRole> FindByNameAsync(string roleName, CancellationToken cancellationToken = default(CancellationToken))
@@ -44,7 +44,7 @@ namespace NHibernate.AspNet.Identity
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.ThrowIfDisposed();
-            if ((object)role == null)
+            if (role == null)
                 throw new ArgumentNullException(nameof(role));
             Context.Save(role);
             Context.Flush();
@@ -125,7 +125,7 @@ namespace NHibernate.AspNet.Identity
         public virtual Task<IdentityResult> UpdateAsync(TRole role, CancellationToken cancellationToken = default(CancellationToken))
         {
             this.ThrowIfDisposed();
-            if ((object)role == null)
+            if (role == null)
                 throw new ArgumentNullException(nameof(role));
             Context.Update(role);
             Context.Flush();
@@ -141,7 +141,7 @@ namespace NHibernate.AspNet.Identity
         public void Dispose()
         {
             this.Dispose(true);
-            GC.SuppressFinalize((object)this);
+            GC.SuppressFinalize(this);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -149,7 +149,7 @@ namespace NHibernate.AspNet.Identity
             if (disposing && !this._disposed && ShouldDisposeSession)
                 this.Context.Dispose();
             this._disposed = true;
-            this.Context = (ISession)null;
+            this.Context = null;
         }
 
         public IQueryable<TRole> Roles

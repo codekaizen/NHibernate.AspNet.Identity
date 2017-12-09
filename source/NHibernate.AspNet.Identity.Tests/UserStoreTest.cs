@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NHibernate.AspNet.Identity.Tests.Models;
+using NHibernate.Linq;
 using NUnit.Framework;
 using TestClass = NUnit.Framework.TestFixtureAttribute;
 using TestInitialize = NUnit.Framework.SetUpAttribute;
@@ -22,6 +23,7 @@ namespace NHibernate.AspNet.Identity.Tests
         private ISession _session;
         private UserManager<ApplicationUser> _userManager;
         private RoleManager<IdentityRole> _roleManager;
+        private readonly UpperInvariantLookupNormalizer _normalizer = new UpperInvariantLookupNormalizer();
 
         [TestInitialize]
         public void Initialize()
@@ -37,13 +39,13 @@ namespace NHibernate.AspNet.Identity.Tests
                 new PasswordHasher<ApplicationUser>(new OptionsManager<PasswordHasherOptions>(new OptionsFactory<PasswordHasherOptions>(new IConfigureOptions<PasswordHasherOptions>[0], new IPostConfigureOptions<PasswordHasherOptions>[0]))),
                 new IUserValidator<ApplicationUser>[0],
                 new IPasswordValidator<ApplicationUser>[0],
-                new UpperInvariantLookupNormalizer(),
+                _normalizer,
                 new IdentityErrorDescriber(),
                 serviceProviderMock.Object,
                 new Logger<UserManager<ApplicationUser>>(loggerFactory));
             _roleManager = new RoleManager<IdentityRole>(new RoleStore<IdentityRole>(_session),
                 new IRoleValidator<IdentityRole>[0],
-                new UpperInvariantLookupNormalizer(),
+                _normalizer,
                 new IdentityErrorDescriber(),
                 new Logger<RoleManager<IdentityRole>>(loggerFactory));
         }
@@ -71,12 +73,11 @@ namespace NHibernate.AspNet.Identity.Tests
             var store = new UserStore<IdentityUser>(_session);
             using (var ts = new TransactionScope(TransactionScopeOption.RequiresNew))
             {
-                var result = store.AddLoginAsync(user, login);
+                await store.AddLoginAsync(user, login);
                 ts.Complete();
-                Assert.IsNull(result.Exception);
             }
 
-            var actual = _session.Query<IdentityUser>().FirstOrDefault(x => x.UserName == user.UserName);
+            var actual = await _session.Query<IdentityUser>().FirstOrDefaultAsync(x => x.UserName == user.UserName);
             var userStored = await store.FindByLoginAsync(login.LoginProvider, login.ProviderKey);
 
             Assert.IsNotNull(actual);
@@ -96,77 +97,78 @@ namespace NHibernate.AspNet.Identity.Tests
 
             using (var ts = new TransactionScope(TransactionScopeOption.RequiresNew))
             {
-                var result = store.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
+                await store.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
                 ts.Complete();
-                Assert.IsNull(result.Exception);
             }
 
-            var actual = _session.Query<IdentityUser>().FirstOrDefault(x => x.UserName == user.UserName);
+            var actual = await _session.Query<IdentityUser>().FirstOrDefaultAsync(x => x.UserName == user.UserName);
             Assert.IsFalse(actual.Logins.Any());
         }
 
         [TestMethod]
-        public void WhenCreateUserAsync()
+        public async Task WhenCreateUserAsync()
         {
             var user = new ApplicationUser { UserName = "RealUserName" };
 
             using (var transaction = new TransactionScope())
             {
-                var result = _userManager.CreateAsync(user, "RealPassword").GetAwaiter().GetResult();
+                var result = await _userManager.CreateAsync(user, "RealPassword");
                 transaction.Complete();
-                Assert.AreEqual(0, result.Errors.Count());
+                Assert.IsEmpty(result.Errors);
             }
 
-            var actual = _session.Query<ApplicationUser>().FirstOrDefault(x => x.UserName == user.UserName);
+            var actual = await _session.Query<ApplicationUser>().FirstOrDefaultAsync(x => x.UserName == user.UserName);
 
             Assert.IsNotNull(actual);
             Assert.AreEqual(user.UserName, actual.UserName);
         }
 
         [TestMethod]
-        public void GivenHaveRoles_WhenDeleteUser_ThenDeletingCausesNoCascade()
+        public async Task GivenHaveRoles_WhenDeleteUser_ThenDeletingCausesNoCascade()
         {
             var user = new IdentityUser("Lukz 04");
-            var role = new IdentityRole("ADM");
+            var role = new IdentityRole("ADM") { NormalizedName = "ADM" };
             var store = new UserStore<IdentityUser>(_session);
             var roleStore = new RoleStore<IdentityRole>(_session);
 
-            roleStore.CreateAsync(role);
-            store.CreateAsync(user);
-            store.AddToRoleAsync(user, "ADM");
+            await roleStore.CreateAsync(role);
+            await store.CreateAsync(user);
+            await store.AddToRoleAsync(user, "ADM");
 
-            Assert.IsTrue(_session.Query<IdentityRole>().Any(x => x.Name == "ADM"));
-            Assert.IsTrue(_session.Query<IdentityUser>().Any(x => x.UserName == "Lukz 04"));
+            Assert.IsTrue(await _session.Query<IdentityRole>().AnyAsync(x => x.Name == "ADM"));
+            Assert.IsTrue(await _session.Query<IdentityUser>().AnyAsync(x => x.UserName == "Lukz 04"));
 
-            var result = store.DeleteAsync(user);
+            var result = await store.DeleteAsync(user);
 
-            Assert.IsNull(result.Exception);
-            Assert.IsFalse(this._session.Query<IdentityUser>().Any(x => x.UserName == "Lukz 04"));
-            Assert.IsTrue(this._session.Query<IdentityRole>().Any(x => x.Name == "ADM"));
+            Assert.IsTrue(result.Succeeded);
+            Assert.IsEmpty(result.Errors);
+            Assert.IsFalse(await this._session.Query<IdentityUser>().AnyAsync(x => x.UserName == "Lukz 04"));
+            Assert.IsTrue(await this._session.Query<IdentityRole>().AnyAsync(x => x.Name == "ADM"));
         }
 
         [TestMethod]
         public async Task WhenRemoveUserFromRole_ThenDoNotDeleteRole_BugFix()
         {
             var user = new IdentityUser("Lukz 05");
-            var role = new IdentityRole("ADM05");
-            var store = new UserStore<IdentityUser>(_session);
-            var roleStore = new RoleStore<IdentityRole>(_session);
+            var roleName = "ADM05";
+            var role = new IdentityRole(roleName) { NormalizedName = this._normalizer.Normalize(roleName) };
+            var store = new UserStore<IdentityUser>(this._session);
+            var roleStore = new RoleStore<IdentityRole>(this._session);
 
-            roleStore.CreateAsync(role);
-            store.CreateAsync(user);
-            store.AddToRoleAsync(user, "ADM05");
+            await roleStore.CreateAsync(role);
+            await store.CreateAsync(user);
+            await store.AddToRoleAsync(user, roleName);
 
-            Assert.IsTrue(_session.Query<IdentityRole>().Any(x => x.Name == "ADM05"));
+            Assert.IsTrue(_session.Query<IdentityRole>().Any(x => x.Name == roleName));
             Assert.IsTrue(_session.Query<IdentityUser>().Any(x => x.UserName == "Lukz 05"));
-            Assert.IsTrue(await store.IsInRoleAsync(user, "ADM05"));
+            Assert.IsTrue(await store.IsInRoleAsync(user, roleName));
 
-            var result = store.RemoveFromRoleAsync(user, "ADM05");
+            var result = store.RemoveFromRoleAsync(user, roleName);
 
             Assert.IsNull(result.Exception);
-            Assert.IsFalse(await store.IsInRoleAsync(user, "ADM05"));
+            Assert.IsFalse(await store.IsInRoleAsync(user, roleName));
             Assert.IsTrue(_session.Query<IdentityUser>().Any(x => x.UserName == "Lukz 05"));
-            Assert.IsTrue(_session.Query<IdentityRole>().Any(x => x.Name == "ADM05"));
+            Assert.IsTrue(_session.Query<IdentityRole>().Any(x => x.Name == roleName));
         }
 
         [TestMethod]
@@ -176,7 +178,7 @@ namespace NHibernate.AspNet.Identity.Tests
             var user2 = new IdentityUser("Moa 01");
             var user3 = new IdentityUser("Win 02");
             var user4 = new IdentityUser("Andre 03");
-            var role = new IdentityRole("ADM");
+            var role = new IdentityRole("ADM") { NormalizedName = "ADM" };
             var store = new UserStore<IdentityUser>(this._session);
             var roleStore = new RoleStore<IdentityRole>(this._session);
 
@@ -301,7 +303,7 @@ namespace NHibernate.AspNet.Identity.Tests
         public async Task EmailConfirmationToken()
         {
             var tokenProvider = new EmailTokenProvider<ApplicationUser>();
-            _userManager.RegisterTokenProvider("Email Provider", tokenProvider);
+            _userManager.RegisterTokenProvider("Default", tokenProvider);
             await _userManager.CreateAsync(new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = false }, "Welcome");
             var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
             var token = await _userManager.GeneratePasswordResetTokenAsync(x);
@@ -327,12 +329,12 @@ namespace NHibernate.AspNet.Identity.Tests
         }
 
         [TestMethod]
-        public async Task CreateWithoutCommitingTransactionScopeShouldNotInsertRows()
+        public async Task CreateWithoutCommittingTransactionScopeShouldNotInsertRows()
         {
-            using (var ts = new TransactionScope(TransactionScopeOption.RequiresNew))
+            using (var ts = new TransactionScope(TransactionScopeOption.RequiresNew, TransactionScopeAsyncFlowOption.Enabled))
             {
                 // session is not opened inside the scope so we need to enlist it manually
-                ((System.Data.Common.DbConnection)_session.Connection).EnlistTransaction(System.Transactions.Transaction.Current);
+                _session.Connection.EnlistTransaction(System.Transactions.Transaction.Current);
                 await _userManager.CreateAsync(new ApplicationUser { UserName = "test", Email = "aaa@bbb.com", EmailConfirmed = true }, "Welcome1");
                 var x = await _userManager.FindByEmailAsync("aaa@bbb.com");
                 await _roleManager.CreateAsync(new IdentityRole("Admin"));
@@ -346,7 +348,7 @@ namespace NHibernate.AspNet.Identity.Tests
         }
 
         [TestMethod]
-        public async Task CreateWithoutCommitingNHibernateTransactionShouldNotInsertRows()
+        public async Task CreateWithoutCommittingNHibernateTransactionShouldNotInsertRows()
         {
             using (var ts = _session.BeginTransaction())
             {

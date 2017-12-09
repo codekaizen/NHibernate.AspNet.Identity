@@ -109,9 +109,11 @@
     <Compile Include="IdentityUserClaim.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="IdentityUserClaimMap.cs" />
     <Compile Include="IdentityUserLogin.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="IdentityUserLoginMap.cs" />
     <Compile Include="IdentityUserToken.cs" />
     <Compile Include="IdentityUserTokenMap.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -97,6 +97,13 @@ namespace NHibernate.AspNet.Identity
                         select l;
 
             return await query.SingleOrDefaultAsync(cancellationToken);
+
+            //var query = from u in this.Users
+            //            from l in u.Logins
+            //            where l.LoginProvider == loginProvider && l.ProviderKey == providerKey
+            //            select u;
+
+            //return query.AsEnumerable().SelectMany(u => u.Logins).Where(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey).SingleOrDefault();
         }
 
         public override Task<IdentityResult> CreateAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
@@ -151,7 +158,8 @@ namespace NHibernate.AspNet.Identity
             user.AddLogin(new IdentityUserLogin
             {
                 ProviderKey = login.ProviderKey,
-                LoginProvider = login.LoginProvider
+                LoginProvider = login.LoginProvider,
+                ProviderDisplayName = login.ProviderDisplayName
             });
 
             await this.Context.FlushAsync(cancellationToken);

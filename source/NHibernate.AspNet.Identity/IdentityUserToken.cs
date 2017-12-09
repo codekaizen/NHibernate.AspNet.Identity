@@ -5,6 +5,20 @@ namespace NHibernate.AspNet.Identity
 {
     public class IdentityUserToken : IdentityUserToken<string>, IEquatable<IdentityUserToken<string>>, IEquatable<IdentityUserToken>
     {
+        public IdentityUserToken()
+        {   
+        }
+
+        public IdentityUserToken(IdentityUserToken<string> token)
+        {
+            if (token == null)
+                throw new ArgumentNullException(nameof(token));
+            this.Name = token.Name;
+            this.UserId = token.UserId;
+            this.LoginProvider = token.LoginProvider;
+            this.Value = token.Value;
+        }
+
         public virtual bool Equals(IdentityUserToken other)
         {
             if (ReferenceEquals(null, other))
