@@ -97,13 +97,6 @@ namespace NHibernate.AspNet.Identity
                         select l;
 
             return await query.SingleOrDefaultAsync(cancellationToken);
-
-            //var query = from u in this.Users
-            //            from l in u.Logins
-            //            where l.LoginProvider == loginProvider && l.ProviderKey == providerKey
-            //            select u;
-
-            //return query.AsEnumerable().SelectMany(u => u.Logins).Where(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey).SingleOrDefault();
         }
 
         public override Task<IdentityResult> CreateAsync(TUser user, CancellationToken cancellationToken = default(CancellationToken))
@@ -139,7 +132,7 @@ namespace NHibernate.AspNet.Identity
             if (user == null)
                 throw new ArgumentNullException(nameof(user));
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             this.Context.Flush();
 
             return IdentityResult.Success;
@@ -154,7 +147,7 @@ namespace NHibernate.AspNet.Identity
             if (login == null)
                 throw new ArgumentNullException(nameof(login));
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             user.AddLogin(new IdentityUserLogin
             {
                 ProviderKey = login.ProviderKey,
@@ -176,7 +169,7 @@ namespace NHibernate.AspNet.Identity
             if (string.IsNullOrWhiteSpace(providerKey))
                 throw new ArgumentException(nameof(providerKey));
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             var login = user.Logins?.SingleOrDefault(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey);
             if (login != null)
             {
@@ -234,7 +227,7 @@ namespace NHibernate.AspNet.Identity
                 throw new ArgumentNullException(nameof(user));
             if (claims == null)
                 throw new ArgumentNullException(nameof(claims));
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             foreach (var claim in claims)
             {
                 user.AddClaim(new IdentityUserClaim
@@ -260,7 +253,7 @@ namespace NHibernate.AspNet.Identity
             if (newClaim == null)
                 throw new ArgumentNullException(nameof(newClaim));
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             var userClaims = user.Claims;
             var matchedClaims = (userClaims?.Where(uc => uc.UserId.Equals(user.Id) && uc.ClaimValue == claim.Value && uc.ClaimType == claim.Type) ?? Enumerable.Empty<IdentityUserClaim>()).ToList();
             foreach (var matchedClaim in matchedClaims)
@@ -281,7 +274,7 @@ namespace NHibernate.AspNet.Identity
             if (claimsToRemove == null)
                 throw new ArgumentNullException(nameof(claimsToRemove));
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             var toRemoveList = claimsToRemove.ToList();
             var removeSet = user.Claims?.Where(c => toRemoveList.Any(r => r.Type == c.ClaimType && r.Value == c.ClaimValue)).ToList();
             if (removeSet != null)
@@ -318,7 +311,7 @@ namespace NHibernate.AspNet.Identity
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException(nameof(name));
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             var token = user?.Tokens.SingleOrDefault(t => t.Name == name && t.LoginProvider == loginProvider);
             return token;
         }
@@ -412,7 +405,7 @@ namespace NHibernate.AspNet.Identity
                 throw new InvalidOperationException(string.Format(CultureInfo.CurrentCulture, Resources.RoleNotFound, normalizedRoleName));
             }
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             user.AddRole(roleEntity);
             await this.Context.FlushAsync(cancellationToken);
         }
@@ -426,7 +419,7 @@ namespace NHibernate.AspNet.Identity
             if (string.IsNullOrWhiteSpace(normalizedRoleName))
                 throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(normalizedRoleName));
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             var identityUserRole = user.Roles.FirstOrDefault(r => r.NormalizedName == normalizedRoleName);
             if (identityUserRole != null)
             {
@@ -443,7 +436,7 @@ namespace NHibernate.AspNet.Identity
             if (user == null)
                 throw new ArgumentNullException(nameof(user));
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             return user.Roles?.Select(u => u.Name).ToList();
         }
 
@@ -456,7 +449,7 @@ namespace NHibernate.AspNet.Identity
             if (string.IsNullOrWhiteSpace(normalizedRoleName))
                 throw new ArgumentException(Resources.ValueCannotBeNullOrEmpty, nameof(normalizedRoleName));
 
-            user = await this.Context.MergeAsync(user, cancellationToken);
+            await this.Context.SaveOrUpdateAsync(user, cancellationToken);
             return user.Roles?.Any(r => r.NormalizedName == normalizedRoleName) ?? false;
         }
 

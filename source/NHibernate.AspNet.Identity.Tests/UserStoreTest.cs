@@ -209,8 +209,8 @@ namespace NHibernate.AspNet.Identity.Tests
             var user2 = new IdentityUser("Moa 01");
             var user3 = new IdentityUser("Win 02");
             var user4 = new IdentityUser("Andre 03");
-            var role = new IdentityRole("ADM");
-            var role2 = new IdentityRole("USR");
+            var role = new IdentityRole("ADM") { NormalizedName = "ADM" };
+            var role2 = new IdentityRole("USR") { NormalizedName = "USR" };
             var store = new UserStore<IdentityUser>(this._session);
             var roleStore = new RoleStore<IdentityRole>(this._session);
 

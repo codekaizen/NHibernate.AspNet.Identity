@@ -138,6 +138,7 @@ namespace NHibernate.AspNet.Identity.Tests
       <key-property name=""LoginProvider"" />
       <key-property name=""ProviderKey"" />
     </composite-id>
+    <property name=""UserId"" length=""40"" />
     <property name=""ProviderDisplayName"" length=""256"" not-null=""true"" />
   </class>
 </hibernate-mapping>
@@ -145,40 +146,8 @@ namespace NHibernate.AspNet.Identity.Tests
 
         private readonly string _testHbm = @"<?xml version=""1.0"" encoding=""utf-8""?>
 <hibernate-mapping xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"" namespace=""NHibernate.AspNet.Identity.Tests.Models"" assembly=""NHibernate.AspNet.Identity.Tests, Version=5.0.2.0, Culture=neutral, PublicKeyToken=null"" xmlns=""urn:nhibernate-mapping-2.2"">
-  <class name=""ApplicationUser"" table=""AspNetUsers"">
-    <id name=""Id"" type=""String"">
-      <generator class=""uuid.hex"">
-        <param name=""format"">D</param>
-      </generator>
-    </id>
-    <property name=""AccessFailedCount"" />
-    <property name=""Email"" />
-    <property name=""EmailConfirmed"" />
-    <property name=""LockoutEnabled"" />
-    <property name=""LockoutEndDateUtc"" />
-    <property name=""PasswordHash"" />
-    <property name=""PhoneNumber"" />
-    <property name=""PhoneNumberConfirmed"" />
-    <property name=""TwoFactorEnabled"" />
-    <property name=""UserName"" length=""255"" not-null=""true"" unique=""true"" />
-    <property name=""SecurityStamp"" />
-    <bag name=""Claims"" cascade=""all,delete-orphan"">
-      <key column=""UserId"" update=""false"" />
-      <one-to-many class=""NHibernate.AspNet.Identity.IdentityUserClaim, NHibernate.AspNet.Identity, Version=5.0.2.0, Culture=neutral, PublicKeyToken=null"" />
-    </bag>
-    <set name=""Logins"" table=""AspNetUserLogins"" cascade=""all,delete-orphan"">
-      <key column=""UserId"" />
-      <one-to-many class=""NHibernate.AspNet.Identity.IdentityUserLogin, NHibernate.AspNet.Identity, Version=5.0.2.0, Culture=neutral, PublicKeyToken=null"" />
-    </set>
-    <bag name=""Roles"" table=""AspNetUserRoles"">
-      <key column=""UserId"" />
-      <many-to-many class=""NHibernate.AspNet.Identity.IdentityRole, NHibernate.AspNet.Identity, Version=5.0.2.0, Culture=neutral, PublicKeyToken=null"" column=""RoleId"" />
-    </bag>
-    <bag name=""Tokens"" table=""AspNetUserTokens"">
-      <key column=""UserId"" />
-      <one-to-many class=""NHibernate.AspNet.Identity.IdentityUserToken, NHibernate.AspNet.Identity, Version=5.0.2.0, Culture=neutral, PublicKeyToken=null"" />
-    </bag>
-  </class>
+  <union-subclass name=""ApplicationUser"" extends=""NHibernate.AspNet.Identity.IdentityUser, NHibernate.AspNet.Identity, Version=5.0.2.0, Culture=neutral, PublicKeyToken=null"">
+  </union-subclass>
 </hibernate-mapping>";
 
         public static SessionFactoryProvider Instance
